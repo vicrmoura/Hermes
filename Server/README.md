@@ -1,1 +1,1 @@
-Run ./setup.sh from this folder
+Run `./setup.sh` from this folder
