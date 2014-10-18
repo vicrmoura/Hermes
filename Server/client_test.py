@@ -1,21 +1,32 @@
 import socket
 import threading
 import SocketServer
+import json
 
-def client(ip, port, message):
+def query_message(sock, query):
+    data = {'type': 'query', 'string' : query, 'limit' : 10, 'offset' : 0}
+    message = json.dumps(data, separators = (',',':'))
+    with open("/hermes/logs/log", "a") as log:
+        log.write("Sending: {}\n".format(message))
+    sock.sendall(message + "\n")
+    response = sock.makefile().readline()
+    with open("/hermes/logs/log", "a") as log:
+        log.write("Received: {}\n".format(response))
+    
+    return response
+
+
+def test_client(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((ip, port))
     try:
-        sock.sendall(message)
-        response = sock.recv(1024)
-        with open("/hermes/logs/log", "a") as log:
-    		log.write("Received: {}\n".format(response))
+        query_message(sock, "SuperMan")
+        query_message(sock, "Batman")
+        
     finally:
         sock.close()
 
 
 if __name__ == "__main__":
     ip, port = "localhost", 9999
-    client(ip, port, "Hello World 1")
-    client(ip, port, "Hello World 2")
-    client(ip, port, "Hello World 3")
+    test_client(ip, port)
