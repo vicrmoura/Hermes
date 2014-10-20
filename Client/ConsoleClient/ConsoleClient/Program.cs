@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Configuration;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -34,6 +35,13 @@ namespace Hermes
 
         private static string[] input;
         private static bool quit = false;
+        private static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+
+        private static string TrackerIP;
+        private static string TrackerPort;
+        private static string LocalIP;
+        private static string LocalPort;
+        private static string BaseFolder;
 
         /* Main */
 
@@ -70,6 +78,14 @@ namespace Hermes
         private static void Initialize()
         {
             Console.WriteLine("Initializing...");
+
+            // Read Settings
+
+            LocalIP = ConfigurationManager.AppSettings["LocalIP"];
+            LocalPort = ConfigurationManager.AppSettings["LocalPort"];
+            TrackerIP = ConfigurationManager.AppSettings["TrackerIP"];
+            TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
+            BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
 
             // Start crawling BaseFolder
 
@@ -113,12 +129,17 @@ namespace Hermes
         {
             if (input.Length == 1)
             {
-                Console.WriteLine(@"Current BaseFolder: C:\Users\User\Folder");
+                Console.WriteLine(@"Current BaseFolder: " + BaseFolder);
             }
             else
             {
-                Console.WriteLine(@"Old BaseFolder: C:\Users\User\Folder");
+                Console.WriteLine(@"Old BaseFolder: " + BaseFolder);
                 Console.WriteLine("New BaseFolder: " + input[1]);
+
+                BaseFolder = input[1];
+                config.AppSettings.Settings["BaseFolder"].Value = BaseFolder;
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection(config.AppSettings.SectionInformation.Name);
             }
         }
 
@@ -126,23 +147,27 @@ namespace Hermes
         {
             if (input.Length == 1)
             {
-                Console.WriteLine("Current IP:   161.24.24.200");
+                Console.WriteLine("Current IP:   " + LocalIP);
                 Console.WriteLine("Current port: 30403");
             }
             else
             {
-                string IP, port;
-                if (TryParseIPPort(input[1], out IP, out port))
-                {
-                    Console.WriteLine("Old IP:   161.24.24.200");
-                    Console.WriteLine("Old port: 30403");
+                Console.WriteLine("Old IP:   " + LocalIP);
+                Console.WriteLine("Old port: 30403");
 
-                    Console.WriteLine("New IP:   " + IP);
-                    Console.WriteLine("New port: " + port);
+                if (TryParseIPPort(input[1], ref LocalIP, ref LocalPort))
+                {
+                    Console.WriteLine("New IP:   " + LocalIP);
+                    Console.WriteLine("New port: " + LocalPort);
+
+                    config.AppSettings.Settings["LocalIP"].Value = LocalIP;
+                    config.AppSettings.Settings["LocalPort"].Value = LocalPort;
+                    config.Save(ConfigurationSaveMode.Modified);
+                    ConfigurationManager.RefreshSection(config.AppSettings.SectionInformation.Name);
                 }
                 else
                 {
-                    Console.WriteLine("IP port in wrong format");
+                    Console.WriteLine("** IP:port in wrong format **");
                 }
             }
         }
@@ -210,11 +235,8 @@ namespace Hermes
             quit = true;
         }
 
-        private static bool TryParseIPPort(string input, out string IP, out string port)
+        private static bool TryParseIPPort(string input, ref string IP, ref string port)
         {
-            IP = "";
-            port = "";
-
             if (input.Contains(' ') || input.Contains('-'))
             {
                 return false;
@@ -226,23 +248,27 @@ namespace Hermes
                 return false;
             }
 
-            IP = parts[0];
-            port = parts[1];
-
             ushort portNum;
-            if (!ushort.TryParse(port, out portNum))
+            if (!ushort.TryParse(parts[1], out portNum))
             {
                 return false;
             }
 
-            parts = IP.Split('.');
-            if (parts.Length != 4)
+            string[] bytes = parts[0].Split('.');
+            if (bytes.Length != 4)
             {
                 return false;
             }
 
             byte b;
-            return parts.All(part => byte.TryParse(part, out b));
+            if (!bytes.All(part => byte.TryParse(part, out b)))
+            {
+                return false;
+            }
+
+            IP = parts[0];
+            port = parts[1];
+            return true;
         }
     }
 }
