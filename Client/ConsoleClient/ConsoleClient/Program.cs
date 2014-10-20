@@ -40,7 +40,9 @@ namespace Hermes
         static void Main(string[] args)
         {
             Console.WriteLine("Hermes Console Client v0.1");
-            
+
+            Initialize();
+
             do {
                 Console.Write(">>> ");
                 input = Console.ReadLine().Trim().Split(new[]{' '}, 2);
@@ -64,6 +66,17 @@ namespace Hermes
         }
 
         /* Methods */
+
+        private static void Initialize()
+        {
+            Console.WriteLine("Initializing...");
+
+            // Start crawling BaseFolder
+
+            // Start p2p-server
+
+            // Start heartbeat
+        }
 
         private static void ExecuteUpload()
         {
