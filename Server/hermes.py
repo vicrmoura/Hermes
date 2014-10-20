@@ -4,6 +4,7 @@ import socket
 import threading
 import SocketServer
 import json
+import random
 
 MAX_SEARCH_LIMIT = 1000
 MAX_PEERS_IN_RESPONSE = 100
@@ -23,7 +24,7 @@ def query_test():
                     "piece_size": 100,
                     "block_size": 5,
                     "sha1s": [], 
-                    "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}}}, 
+                    "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}, "ccc":{"timestamp": 800, "port": 1111, "ip": "10.1.1.2"}}}, 
              "2" : {
                     "name": "Batman: The Dark Knight",
                     "size": 10000,
@@ -72,14 +73,48 @@ def search(search_text, limit, offset):
                 } for i in match_ids ]
     return {"type" : "queryresponse", "results": results}
 
+def sample_peers(fileID, peerID, maxPeers):
+
+    peer_entry = file_info[fileID]["peers"][peerID]
+    del file_info[fileID]["peers"][peerID]
+    numOfPeers = min(maxPeers, MAX_PEERS_IN_RESPONSE, len(file_info[fileID]["peers"]))
+
+    # Reservoir sampling
+    iterator = iter(file_info[fileID]["peers"])    
+    result = [next(iterator) for _ in range(numOfPeers)]
+
+    n = numOfPeers
+    for item in iterator:
+        n += 1
+        s = random.randint(0, n)
+        if s < numOfPeers:
+            result[s] = item
+
+    file_info[fileID]["peers"][peerID] = peer_entry
+    return [{"peerID" : peerid, 
+             "port" : file_info[fileID]["peers"][peerid]["port"],
+             "ip" : file_info[fileID]["peers"][peerid]["ip"]} 
+            for peerid in result]
+    
+
+def process_request_started(fileID, peerID, port, ip):
+    file_info[fileID]["peers"][peerID] = {"timestamp": 0, "port": port, "ip": ip}
+
+
 def process_request(files, peerID, port, ip, maxPeers):
     response = { "type": "response", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
-        if fileID in file_info:
-            response["peers"] = [{"peerID" : peerid, 
-                                  "port" : peerdata["port"],
-                                  "ip" : peerdata["ip"]} 
-                                 for peerid, peerdata in file_info[fileID]["peers"].iteritems()]
+        if event == "started":
+            process_request_started(fileID, peerID, port, ip)
+            response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
+
+        # if fileID in file_info:
+        #     response["peers"][fileID] = [{"peerID" : peerid, 
+        #                           "port" : peerdata["port"],
+        #                           "ip" : peerdata["ip"]} 
+        #                          for peerid, peerdata in file_info[fileID]["peers"].iteritems()]
+    
+
     return response
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
@@ -139,6 +174,8 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 return ""
 
         result = process_request(files, peerID, port, ip, maxPeers)
+        if result == "":
+            return ""
         return convert_data_jsonline(result)
 
     def handle(self):
