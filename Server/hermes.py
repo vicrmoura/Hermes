@@ -6,6 +6,9 @@ import SocketServer
 import json
 
 MAX_SEARCH_LIMIT = 1000
+MAX_PEERS_IN_RESPONSE = 100
+HEARTBEAT_INTERVAL = 10
+
 
 file_info = {}
 search_map = {}
@@ -14,28 +17,28 @@ def query_test():
     global file_info
     global search_map
     
-    file_info = {1 : { 
+    file_info = {"1" : { 
                     "name": "Batman Begins",
                     "size": 10000,
                     "piece_size": 100,
                     "block_size": 5,
                     "sha1s": [], 
-                    "peers": {123:[], 11111:[]}}, 
-             2 : {
+                    "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}}}, 
+             "2" : {
                     "name": "Batman: The Dark Knight",
                     "size": 10000,
                     "piece_size": 100,
                     "block_size": 5,
                     "sha1s": [], 
-                    "peers": {123:[], 11111:[]}},
-             3 : {
+                    "peers": {"aaa":{"timestamp": 50, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 75, "port": 6666, "ip": "11.12.13.14"}}},
+             "3" : {
                     "name": "Batman: The Dark Knight Rises",
                     "size": 10000,
                     "piece_size": 100,
                     "block_size": 5,
                     "sha1s": [], 
-                    "peers": {11111:[]}},
-             4 : {
+                    "peers": {"bbb":{"timestamp": 59, "port": 6666, "ip": "11.12.13.14"}}},
+             "4" : {
                     "name": "Superman",
                     "size": 10000,
                     "piece_size": 100,
@@ -44,7 +47,7 @@ def query_test():
                     "peers": {}}
             }
 
-    search_map = {"batman" : [1, 2, 3], "superman" : [4]}
+    search_map = {"batman" : ["1", "2", "3"], "superman" : ["4"]}
 
 def convert_data_jsonline(data):
     return json.dumps(data, separators = (',',':'))+"\n"
@@ -69,32 +72,73 @@ def search(search_text, limit, offset):
                 } for i in match_ids ]
     return {"type" : "queryresponse", "results": results}
 
+def process_request(files, peerID, port, ip, maxPeers):
+    response = { "type": "response", "peers": {}, "interval": HEARTBEAT_INTERVAL}
+    for fileID, event in files.iteritems():
+        if fileID in file_info:
+            response["peers"] = [{"peerID" : peerid, 
+                                  "port" : peerdata["port"],
+                                  "ip" : peerdata["ip"]} 
+                                 for peerid, peerdata in file_info[fileID]["peers"].iteritems()]
+    return response
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
-    def handle_query(self, data):
-        if "string" not in data:
-            log_missing_field("string", data)
-            return
-        search_text = data["string"]
+    def handle_query(self):
+        if "string" not in self.data:
+            log_missing_field("string", self.data)
+            return ""
+        search_text = self.data["string"]
 
         limit = MAX_SEARCH_LIMIT
-        if "limit" in data:
-            limit = data["limit"]
+        if "limit" in self.data:
+            limit = self.data["limit"]
             if limit <= 0:
-                log ("Search limit shold be greater than zero," + 
-                        " but is: {} from: {}".format(limit, data))
-                return
+                log ("Search limit should be greater than zero," + 
+                        " but is: {} from: {}".format(limit, self.data))
+                return ""
         
         offset = 0
-        if "offset" in data:
-            offset = data["offset"]
+        if "offset" in self.data:
+            offset = self.data["offset"]
             if offset < 0:
-                log ("Search offset shold not be negative," + 
-                        " but is: {} from: {}".format(offset, data))
-                return
+                log ("Search offset should not be negative," + 
+                        " but is: {} from: {}".format(offset, self.data))
+                return ""
         
         result = search(search_text, limit, offset)
+        return convert_data_jsonline(result)
+
+    def handle_request(self):
+        if "files" not in self.data:
+            log_missing_field("files", self.data)
+            return ""
+        files = self.data["files"]
+
+        if "peerID" not in self.data:
+            log_missing_field("peerID", self.data)
+            return ""
+        peerID = self.data["peerID"]
+
+        if "port" not in self.data:
+            log_missing_field("port", self.data)
+            return ""
+        port = self.data["port"]
+
+        if "ip" not in self.data:
+            log_missing_field("ip", self.data)
+            return ""
+        ip = self.data["ip"]
+
+        maxPeers = MAX_PEERS_IN_RESPONSE
+        if "maxPeers" in self.data:
+            maxPeers = self.data["maxPeers"]
+            if maxPeers < 0:
+                log ("maxPeers should not be negative," + 
+                        " but is: {} from: {}".format(maxPeers, self.data))
+                return ""
+
+        result = process_request(files, peerID, port, ip, maxPeers)
         return convert_data_jsonline(result)
 
     def handle(self):
@@ -106,25 +150,26 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             message = message.strip()
             log ("Message Received: {}".format(message))
             try:
-                data = json.loads(message)
+                self.data = json.loads(message)
             except ValueError, e:
                 log_bad_json("type")
                 continue
 
-            if "type" not in data:
-                log_missing_field("type", data)
+            if "type" not in self.data:
+                log_missing_field("type", self.data)
                 continue
 
-
-            if data["type"] == "query":
-                response = self.handle_query(data)
+            if self.data["type"] == "query":
+                response = self.handle_query()
+            elif self.data["type"] == "request":
+                response = self.handle_request()
             else:
-                log("Unable to match type: {} from: {}".format(data["type"], data))
+                log("Unable to match type: {} from: {}".format(self.data["type"], self.data))
                 continue
 
-            self.request.sendall(response)
-
-            log("Response Sent: {}".format(response))
+            if response != "":
+                self.request.sendall(response)
+                log("Response Sent: {}".format(response))
 
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
