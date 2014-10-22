@@ -12,39 +12,38 @@ namespace Hermes
 {
     class Program
     {
-        /* Constants */
-
+        #region /* Constants */
         private const string spaces = "\n                         ";
         private static readonly IReadOnlyDictionary<string, TSSA> options = new ReadOnlyDictionary<string, TSSA>(new Dictionary<string, TSSA>
         {
-            { "help", new TSSA("", "Show available commands and version", ExecuteHelp) },
-            { "upload", new TSSA("", "Crawl BaseFolder and upload metainfos for not-yet-" + spaces + "tracked files", ExecuteUpload) },
-            { "search", new TSSA("<string>", "Search a file containing <string> in database", ExecuteSearch) },
-            { "list", new TSSA("[<filter>]", "List files info: file name, fileID, size, percentage" + spaces + "completed, amount of running threads, state (=filter)." + spaces + "Filters (subset of): {completed, downloading, paused}", ExecuteList) },
-            { "stats", new TSSA("", "Statistics: total downloading files, total uploading" + spaces + "files, total connections", ExecuteStats) },
-            { "base", new TSSA("[<path>]", "Show [or set] BaseFolder", ExecuteBase) },
-            { "ip", new TSSA("[<ip:port>]", "Show [or set] local IP and port", ExecuteIP) },
-            { "download", new TSSA("<fileID>", "Start downloading <fileID>", ExecuteExecutewnload) },
-            { "pause", new TSSA("<fileID>", "Pause downloading <fileID>", ExecutePause) },
-            { "continue", new TSSA("<fileID>", "Continue downloading <fileID>", ExecuteContinue) },
-            { "cancel", new TSSA("<fileID>", "Cancel download of <fileID>", ExecuteCancel) },
-            { "quit", new TSSA("", "Close gracefully all connections and quit program", ExecuteQuit) },
+            { "help",     new TSSA("",            "Show available commands and version", ExecuteHelp) },
+            { "upload",   new TSSA("",            "Crawl BaseFolder and upload metainfos for not-yet-" + spaces + "tracked files", ExecuteUpload) },
+            { "search",   new TSSA("<string>",    "Search a file containing <string> in database", ExecuteSearch) },
+            { "list",     new TSSA("[<filter>]",  "List files info: file name, fileID, size, percentage" + spaces + "completed, amount of running threads, state (=filter)." + spaces + "Filters (subset of): {completed, downloading, paused}", ExecuteList) },
+            { "stats",    new TSSA("",            "Statistics: total downloading files, total uploading" + spaces + "files, total connections", ExecuteStats) },
+            { "base",     new TSSA("[<path>]",    "Show [or set] BaseFolder", ExecuteBase) },
+            { "ip",       new TSSA("[<ip:port>]", "Show [or set] local IP and port", ExecuteIP) },
+            { "download", new TSSA("<fileID>",    "Start downloading <fileID>", ExecuteDownload) },
+            { "pause",    new TSSA("<fileID>",    "Pause downloading <fileID>", ExecutePause) },
+            { "continue", new TSSA("<fileID>",    "Continue downloading <fileID>", ExecuteContinue) },
+            { "cancel",   new TSSA("<fileID>",    "Cancel download of <fileID>", ExecuteCancel) },
+            { "quit",     new TSSA("",            "Close gracefully all connections and quit program", ExecuteQuit) },
         });
+        #endregion
 
-        /* Fields */
-
+        #region /* Fields */
+        private static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
         private static string[] input;
         private static bool quit = false;
-        private static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
 
         private static string TrackerIP;
         private static string TrackerPort;
         private static string LocalIP;
         private static string LocalPort;
         private static string BaseFolder;
+        #endregion
 
-        /* Main */
-
+        #region /* Main */
         static void Main(string[] args)
         {
             Console.WriteLine("Hermes Console Client v0.1");
@@ -72,33 +71,59 @@ namespace Hermes
                 }
             } while(!quit);
         }
+        #endregion
 
-        /* Methods */
+        #region /* Methods */
 
+        #region /* Other methods */
         private static void Initialize()
         {
             Console.WriteLine("Initializing...");
 
             // Read Settings
 
+            Console.Write(string.Format(" * {0,-30}", "Read Settings"));
             LocalIP = ConfigurationManager.AppSettings["LocalIP"];
             LocalPort = ConfigurationManager.AppSettings["LocalPort"];
             TrackerIP = ConfigurationManager.AppSettings["TrackerIP"];
             TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
             BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
+            Console.WriteLine("[OK]");
 
             // Start crawling BaseFolder
 
+            Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
+            StartCrawlingBaseFolder();
+            Console.WriteLine("[OK]");
+
             // Start p2p-server
 
+            Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
+            // TODO: Start p2p-server
+            Console.WriteLine("[OK]");
+
             // Start heartbeat
+
+            Console.Write(string.Format(" * {0,-30}", "Start heartbeat"));
+            // TODO: Start heartbeat
+            Console.Write("[OK]");
         }
 
+        // TODO: StartCrawlingBaseFolder
+        private static void StartCrawlingBaseFolder()
+        {
+
+        }
+        #endregion
+
+        #region /* Execute Methods */
         private static void ExecuteUpload()
         {
+            StartCrawlingBaseFolder();
             Console.WriteLine("Started to crawl BaseFolder");
         }
 
+        // TODO: ExecuteSearch
         private static void ExecuteSearch()
         {
             if (input.Length == 1)
@@ -112,12 +137,14 @@ namespace Hermes
             }
         }
 
+        // TODO: ExecuteList
         private static void ExecuteList()
         {
             Console.WriteLine("|--- Name ---|--- ID ---|--- size ---|--- % completed ---|");
             Console.WriteLine("...");
         }
 
+        // TODO: ExecuteStats
         private static void ExecuteStats()
         {
             Console.WriteLine("Downloading: x files");
@@ -140,6 +167,9 @@ namespace Hermes
                 config.AppSettings.Settings["BaseFolder"].Value = BaseFolder;
                 config.Save(ConfigurationSaveMode.Modified);
                 ConfigurationManager.RefreshSection(config.AppSettings.SectionInformation.Name);
+
+                StartCrawlingBaseFolder();
+                Console.WriteLine("Started to crawl BaseFolder");
             }
         }
 
@@ -172,7 +202,8 @@ namespace Hermes
             }
         }
 
-        private static void ExecuteExecutewnload()
+        // TODO: ExecuteExecutewnload
+        private static void ExecuteDownload()
         {
             if (input.Length == 2)
             {
@@ -184,6 +215,7 @@ namespace Hermes
             }
         }
 
+        // TODO: ExecutePause
         private static void ExecutePause()
         {
             if (input.Length == 2)
@@ -196,6 +228,7 @@ namespace Hermes
             }
         }
 
+        // TODO: ExecuteContinue
         private static void ExecuteContinue()
         {
             if (input.Length == 2)
@@ -208,6 +241,7 @@ namespace Hermes
             }
         }
 
+        // TODO: ExecuteCancel
         private static void ExecuteCancel()
         {
             if (input.Length == 2)
@@ -229,6 +263,7 @@ namespace Hermes
             Console.WriteLine();
         }
 
+        // TODO: ExecuteQuit
         private static void ExecuteQuit()
         {
             Console.WriteLine("Closing connections...");
@@ -270,5 +305,8 @@ namespace Hermes
             port = parts[1];
             return true;
         }
+        #endregion
+
+        #endregion
     }
 }
