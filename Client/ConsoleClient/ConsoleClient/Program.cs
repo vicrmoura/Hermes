@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
+using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Xml.Serialization;
 
 using TSSA = System.Tuple<string, string, System.Action>;
+using SFile = System.IO.File;
 
 namespace Hermes
 {
@@ -33,9 +36,11 @@ namespace Hermes
 
         #region /* Fields */
         private static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+        private static bool crawling = false;
         private static string[] input;
         private static bool quit = false;
-
+        private static Dictionary<string, File> files;
+        
         private static string TrackerIP;
         private static string TrackerPort;
         private static string LocalIP;
@@ -90,6 +95,23 @@ namespace Hermes
             BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
             Console.WriteLine("[OK]");
 
+            // Load database
+
+            Console.Write(string.Format(" * {0,-30}", "Load database"));
+            if (SFile.Exists("database.xml"))
+            {
+                using (StreamReader sr = new StreamReader("database.xml"))
+                {
+                    XmlSerializer serializer = new XmlSerializer(typeof(File[]), new XmlRootAttribute() { ElementName = "files" });
+                    files = ((File[])serializer.Deserialize(sr)).ToDictionary(file => file.Name);
+                }
+            }
+            else
+            {
+                files = new Dictionary<string, File>();
+            }
+            Console.WriteLine("[OK]");
+
             // Start crawling BaseFolder
 
             Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
@@ -106,13 +128,28 @@ namespace Hermes
 
             Console.Write(string.Format(" * {0,-30}", "Start heartbeat"));
             // TODO: Start heartbeat
-            Console.Write("[OK]");
+            Console.WriteLine("[OK]");
         }
 
         // TODO: StartCrawlingBaseFolder
         private static void StartCrawlingBaseFolder()
         {
+            if (crawling)
+            {
+                return;
+            }
 
+            crawling = true;
+
+            Task.Run(() => {
+                foreach (string filePath in Directory.EnumerateFiles(BaseFolder))
+                {
+                    if (!files.ContainsKey(filePath))
+                    {
+                        // TODO: Create metainfo for that file
+                    }
+                }
+            });
         }
         #endregion
 
