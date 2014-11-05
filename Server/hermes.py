@@ -2,14 +2,14 @@
 
 import socket
 import threading
+import time
 import SocketServer
 import json
 import random
 
 MAX_SEARCH_LIMIT = 1000
 MAX_PEERS_IN_RESPONSE = 100
-HEARTBEAT_INTERVAL = 10
-
+HEARTBEAT_INTERVAL = 1000
 
 file_info = {}
 search_map = {}
@@ -50,6 +50,9 @@ def query_test():
 
     search_map = {"batman" : ["1", "2", "3"], "superman" : ["4"]}
 
+def current_time_ms():
+    return int(time.time()*1000.0)
+
 def convert_data_jsonline(data):
     return json.dumps(data, separators = (',',':'))+"\n"
 
@@ -74,9 +77,12 @@ def search(search_text, limit, offset):
     return {"type" : "queryresponse", "results": results}
 
 def sample_peers(fileID, peerID, maxPeers):
+    if peerID in file_info[fileID]["peers"]:
+        peer_entry = file_info[fileID]["peers"][peerID]
+        del file_info[fileID]["peers"][peerID]
+    else: 
+        peer_entry = None
 
-    peer_entry = file_info[fileID]["peers"][peerID]
-    del file_info[fileID]["peers"][peerID]
     numOfPeers = min(maxPeers, MAX_PEERS_IN_RESPONSE, len(file_info[fileID]["peers"]))
 
     # Reservoir sampling
@@ -90,36 +96,46 @@ def sample_peers(fileID, peerID, maxPeers):
         if s < numOfPeers:
             result[s] = item
 
-    file_info[fileID]["peers"][peerID] = peer_entry
+    if peer_entry != None: 
+        file_info[fileID]["peers"][peerID] = peer_entry
+
     return [{"peerID" : peerid, 
              "port" : file_info[fileID]["peers"][peerid]["port"],
              "ip" : file_info[fileID]["peers"][peerid]["ip"]} 
             for peerid in result]
     
 
-def process_request_started(fileID, peerID, port, ip):
-    file_info[fileID]["peers"][peerID] = {"timestamp": 0, "port": port, "ip": ip}
+def process_heartbeat_started(fileID, peerID, port, ip):
+    process_heartbeat_downloading(fileID, peerID, port, ip)
+    log(peerID + " started on " + fileID)
 
+def process_heartbeat_stopped(fileID, peerID, port, ip):
+    if peerID in file_info[fileID]["peers"]:
+        del file_info[fileID]["peers"][peerID]
 
-def process_request(files, peerID, port, ip, maxPeers):
+def process_heartbeat_downloading(fileID, peerID, port, ip):
+    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
+
+def process_heartbeat_completed(fileID, peerID, port, ip):
+    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
+
+def process_heartbeat(files, peerID, port, ip, maxPeers):
     response = { "type": "response", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
         if event == "started":
-            process_request_started(fileID, peerID, port, ip)
-            response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
-
-        # if fileID in file_info:
-        #     response["peers"][fileID] = [{"peerID" : peerid, 
-        #                           "port" : peerdata["port"],
-        #                           "ip" : peerdata["ip"]} 
-        #                          for peerid, peerdata in file_info[fileID]["peers"].iteritems()]
-    
-
+            process_heartbeat_started(fileID, peerID, port, ip)
+        elif event == "stopped":
+            process_heartbeat_stopped(fileID, peerID, port, ip)
+        elif event == "completed":
+            process_heartbeat_completed(fileID, peerID, port, ip)
+        elif event == "downloading":
+            process_heartbeat_stopped(fileID, peerID, port, ip)
+        response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
     return response
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
-    def handle_query(self):
+    def handle_search_query(self):
         if "string" not in self.data:
             log_missing_field("string", self.data)
             return ""
@@ -144,7 +160,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
         result = search(search_text, limit, offset)
         return convert_data_jsonline(result)
 
-    def handle_request(self):
+    def handle_heartbeat(self):
         if "files" not in self.data:
             log_missing_field("files", self.data)
             return ""
@@ -173,7 +189,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                         " but is: {} from: {}".format(maxPeers, self.data))
                 return ""
 
-        result = process_request(files, peerID, port, ip, maxPeers)
+        result = process_heartbeat(files, peerID, port, ip, maxPeers)
         if result == "":
             return ""
         return convert_data_jsonline(result)
@@ -197,9 +213,9 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 continue
 
             if self.data["type"] == "query":
-                response = self.handle_query()
+                response = self.handle_search_query()
             elif self.data["type"] == "request":
-                response = self.handle_request()
+                response = self.handle_heartbeat()
             else:
                 log("Unable to match type: {} from: {}".format(self.data["type"], self.data))
                 continue
@@ -207,6 +223,17 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             if response != "":
                 self.request.sendall(response)
                 log("Response Sent: {}".format(response))
+
+def check_heartbeat(wait_interval_ms):
+    
+    while True:
+        time.sleep(wait_interval_ms/1000)
+        current_time = current_time_ms()
+        for fileID, info in file_info.iteritems():
+            for peerID in info['peers'].keys():
+                if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
+                    del info['peers'][peerID]
+                    log("Peer " + peerID + " removed from " + fileID)
 
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
@@ -224,4 +251,8 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = False
     server_thread.start()
+
+    heartbeat_thread = threading.Thread(target=check_heartbeat, args = [2*HEARTBEAT_INTERVAL])
+    heartbeat_thread.start()
+
     log("Started")

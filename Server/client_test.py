@@ -29,6 +29,8 @@ def test_client(ip, port):
         #query_message(sock, "SuperMan")
         #query_message(sock, "Batman")
         heartbeat_start(sock, "1", "started")
+        #heartbeat_start(sock, "1", "stopped")
+
         
     finally:
         sock.close()
