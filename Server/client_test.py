@@ -20,7 +20,7 @@ def query_message(sock, query):
 
 def heartbeat_start(sock, fileid, event):
     data = {'type': 'request', 'files': {fileid: event},'peerID' : 'yyy', 'port' : 4444, 'ip' : '198.161.1.1', 'maxPeers' : 2}
-    return message(sock, data)
+    threading.Thread(target = message, args = [sock, data]).start()
 
 def test_client(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,7 +28,8 @@ def test_client(ip, port):
     try:
         #query_message(sock, "SuperMan")
         #query_message(sock, "Batman")
-        heartbeat_start(sock, "1", "started")
+        for i in range(100):
+            heartbeat_start(sock, "1", "started")
         #heartbeat_start(sock, "1", "stopped")
 
         

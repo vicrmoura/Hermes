@@ -12,41 +12,45 @@ MAX_PEERS_IN_RESPONSE = 100
 HEARTBEAT_INTERVAL = 1000
 
 file_info = {}
+file_info_locks = {}
 search_map = {}
+# No need to lock search_map, because all access are one lined and the data structure is already locked
 
 def query_test():
     global file_info
     global search_map
-    
-    file_info = {"1" : { 
-                    "name": "Batman Begins",
-                    "size": 10000,
-                    "piece_size": 100,
-                    "block_size": 5,
-                    "sha1s": [], 
-                    "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}, "ccc":{"timestamp": 800, "port": 1111, "ip": "10.1.1.2"}}}, 
-             "2" : {
-                    "name": "Batman: The Dark Knight",
-                    "size": 10000,
-                    "piece_size": 100,
-                    "block_size": 5,
-                    "sha1s": [], 
-                    "peers": {"aaa":{"timestamp": 50, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 75, "port": 6666, "ip": "11.12.13.14"}}},
-             "3" : {
-                    "name": "Batman: The Dark Knight Rises",
-                    "size": 10000,
-                    "piece_size": 100,
-                    "block_size": 5,
-                    "sha1s": [], 
-                    "peers": {"bbb":{"timestamp": 59, "port": 6666, "ip": "11.12.13.14"}}},
-             "4" : {
-                    "name": "Superman",
-                    "size": 10000,
-                    "piece_size": 100,
-                    "block_size": 5,
-                    "sha1s": [],
-                    "peers": {}}
-            }
+    file_info = {
+         "1" : { 
+                "name": "Batman Begins",
+                "size": 10000,
+                "piece_size": 100,
+                "block_size": 5,
+                "sha1s": [], 
+                "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}, "ccc":{"timestamp": 800, "port": 1111, "ip": "10.1.1.2"}}}, 
+         "2" : {
+                "name": "Batman: The Dark Knight",
+                "size": 10000,
+                "piece_size": 100,
+                "block_size": 5,
+                "sha1s": [], 
+                "peers": {"aaa":{"timestamp": 50, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 75, "port": 6666, "ip": "11.12.13.14"}}},
+         "3" : {
+                "name": "Batman: The Dark Knight Rises",
+                "size": 10000,
+                "piece_size": 100,
+                "block_size": 5,
+                "sha1s": [], 
+                "peers": {"bbb":{"timestamp": 59, "port": 6666, "ip": "11.12.13.14"}}},
+         "4" : {
+                "name": "Superman",
+                "size": 10000,
+                "piece_size": 100,
+                "block_size": 5,
+                "sha1s": [],
+                "peers": {}}
+        }
+    for fileID in file_info:
+        file_info_locks[fileID] = threading.RLock()
 
     search_map = {"batman" : ["1", "2", "3"], "superman" : ["4"]}
 
@@ -68,12 +72,15 @@ def log_bad_json(bad_json):
 
 def search(search_text, limit, offset):
     match_ids = search_map[search_text.lower()][offset:min(MAX_SEARCH_LIMIT, limit)]
-    results = [ {
+    results = []
+    for i in match_ids:
+        with file_info_lock[i]:
+            results.append( {
                     "name": file_info[i]["name"],
                     "size": file_info[i]["size"],
                     "fileID": i,
                     "numOfPeers": len(file_info[i]["peers"])
-                } for i in match_ids ]
+                } )
     return {"type" : "queryresponse", "results": results}
 
 def sample_peers(fileID, peerID, maxPeers):
@@ -107,7 +114,6 @@ def sample_peers(fileID, peerID, maxPeers):
 
 def process_heartbeat_started(fileID, peerID, port, ip):
     process_heartbeat_downloading(fileID, peerID, port, ip)
-    log(peerID + " started on " + fileID)
 
 def process_heartbeat_stopped(fileID, peerID, port, ip):
     if peerID in file_info[fileID]["peers"]:
@@ -122,15 +128,16 @@ def process_heartbeat_completed(fileID, peerID, port, ip):
 def process_heartbeat(files, peerID, port, ip, maxPeers):
     response = { "type": "response", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
-        if event == "started":
-            process_heartbeat_started(fileID, peerID, port, ip)
-        elif event == "stopped":
-            process_heartbeat_stopped(fileID, peerID, port, ip)
-        elif event == "completed":
-            process_heartbeat_completed(fileID, peerID, port, ip)
-        elif event == "downloading":
-            process_heartbeat_stopped(fileID, peerID, port, ip)
-        response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
+        with file_info_locks[fileID]:
+            if event == "started":
+                process_heartbeat_started(fileID, peerID, port, ip)
+            elif event == "stopped":
+                process_heartbeat_stopped(fileID, peerID, port, ip)
+            elif event == "completed":
+                process_heartbeat_completed(fileID, peerID, port, ip)
+            elif event == "downloading":
+                process_heartbeat_stopped(fileID, peerID, port, ip)
+            response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
     return response
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
