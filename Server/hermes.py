@@ -16,36 +16,35 @@ file_info_locks = {}
 search_map = {}
 # No need to lock search_map, because all access are one lined and the data structure is already locked
 
+file_id_counter = 0
+file_id_counter_lock = threading.RLock()
+
 def query_test():
     global file_info
     global search_map
     file_info = {
          "1" : { 
                 "name": "Batman Begins",
-                "size": 10000,
-                "piece_size": 100,
-                "block_size": 5,
+                "pieceSize": 100,
+                "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}, "ccc":{"timestamp": 800, "port": 1111, "ip": "10.1.1.2"}}}, 
          "2" : {
                 "name": "Batman: The Dark Knight",
-                "size": 10000,
-                "piece_size": 100,
-                "block_size": 5,
+                "pieceSize": 100,
+                "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"aaa":{"timestamp": 50, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 75, "port": 6666, "ip": "11.12.13.14"}}},
          "3" : {
                 "name": "Batman: The Dark Knight Rises",
-                "size": 10000,
-                "piece_size": 100,
-                "block_size": 5,
+                "pieceSize": 100,
+                "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"bbb":{"timestamp": 59, "port": 6666, "ip": "11.12.13.14"}}},
          "4" : {
                 "name": "Superman",
-                "size": 10000,
-                "piece_size": 100,
-                "block_size": 5,
+                "pieceSize": 100,
+                "blockSize": 5,
                 "sha1s": [],
                 "peers": {}}
         }
@@ -70,7 +69,7 @@ def log_missing_field(field, data):
 def log_bad_json(bad_json):
     log("Bad json: {}".format(bad_json))
 
-def search(search_text, limit, offset):
+def process_search_query(search_text, limit, offset):
     match_ids = search_map[search_text.lower()][offset:min(MAX_SEARCH_LIMIT, limit)]
     results = []
     for i in match_ids:
@@ -81,7 +80,7 @@ def search(search_text, limit, offset):
                     "fileID": i,
                     "numOfPeers": len(file_info[i]["peers"])
                 } )
-    return {"type" : "queryresponse", "results": results}
+    return {"type" : "queryResponse", "results": results}
 
 def sample_peers(fileID, peerID, maxPeers):
     if peerID in file_info[fileID]["peers"]:
@@ -126,7 +125,7 @@ def process_heartbeat_completed(fileID, peerID, port, ip):
     file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
 
 def process_heartbeat(files, peerID, port, ip, maxPeers):
-    response = { "type": "response", "peers": {}, "interval": HEARTBEAT_INTERVAL}
+    response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
         with file_info_locks[fileID]:
             if event == "started":
@@ -139,6 +138,51 @@ def process_heartbeat(files, peerID, port, ip, maxPeers):
                 process_heartbeat_stopped(fileID, peerID, port, ip)
             response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
     return response
+
+def find_by_sha1s(pieceSize, blockSize, piecesSHA1S):
+    for fileID in file_info.keys():
+        with file_info_locks[fileID]:
+            if pieceSize != file_info[fileID]["pieceSize"]:
+                continue
+            if blockSize != file_info[fileID]["blockSize"]:
+                continue
+            filesha1s = file_info[fileID]["sha1s"]
+            if len(filesha1s) != len(piecesSHA1S):
+                continue
+            similar = True
+            for i in range(len(piecesSHA1S)):
+                if len(piecesSHA1S[i]) != 4:
+                    log("piece SHA1 with wrong size")
+                    similar = False
+                    break
+                for j in range(4):
+                    if piecesSHA1S[i][j] != filesha1s[i][j]:
+                        similar = False
+                        break
+                if not similar:
+                    break
+            if similar:
+                return fileID
+    return None
+
+def generate_new_id():
+    with file_id_counter_lock:
+        global file_id_counter
+        file_id_counter += 1
+        return str(file_id_counter)
+
+def process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip):
+    fileID = find_by_sha1s(pieceSize, blockSize, piecesSHA1S)
+    if fileID is None:
+        fileID = generate_new_id()
+        file_info_locks[fileID] = threading.RLock()
+        file_info[fileID] = {"name": fileName,
+                             "pieceSize": pieceSize,
+                             "blockSize": blockSize,
+                             "sha1s": piecesSHA1S,
+                             "peers": {peerID: {"timestamp": current_time_ms(), "port": port, "ip": ip}}}
+    return { "type": "uploadResponse", "fileID": fileID, "interval": HEARTBEAT_INTERVAL}
+
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
@@ -164,7 +208,48 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                         " but is: {} from: {}".format(offset, self.data))
                 return ""
         
-        result = search(search_text, limit, offset)
+        result = process_search_query(search_text, limit, offset)
+        return convert_data_jsonline(result)
+
+    def handle_upload(self):
+        if "fileName" not in self.data:
+            log_missing_field("fileName", self.data)
+            return ""
+        fileName = self.data["fileName"]
+
+        if "pieceSize" not in self.data:
+            log_missing_field("pieceSize", self.data)
+            return ""
+        pieceSize = self.data["pieceSize"]
+
+        if "blockSize" not in self.data:
+            log_missing_field("blockSize", self.data)
+            return ""
+        blockSize = self.data["blockSize"]
+
+        if "piecesSHA1S" not in self.data:
+            log_missing_field("piecesSHA1S", self.data)
+            return ""
+        piecesSHA1S = self.data["piecesSHA1S"]
+
+        if "peerID" not in self.data:
+            log_missing_field("peerID", self.data)
+            return ""
+        peerID = self.data["peerID"]
+
+        if "port" not in self.data:
+            log_missing_field("port", self.data)
+            return ""
+        port = self.data["port"]
+
+        if "ip" not in self.data:
+            log_missing_field("ip", self.data)
+            return ""
+        ip = self.data["ip"]
+
+        result = process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip)
+        if result == "":
+            return ""
         return convert_data_jsonline(result)
 
     def handle_heartbeat(self):
@@ -221,8 +306,10 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
             if self.data["type"] == "query":
                 response = self.handle_search_query()
-            elif self.data["type"] == "request":
+            elif self.data["type"] == "heartbeat":
                 response = self.handle_heartbeat()
+            elif self.data["type"] == "upload":
+                response = self.handle_upload()
             else:
                 log("Unable to match type: {} from: {}".format(self.data["type"], self.data))
                 continue
@@ -236,11 +323,13 @@ def check_heartbeat(wait_interval_ms):
     while True:
         time.sleep(wait_interval_ms/1000)
         current_time = current_time_ms()
-        for fileID, info in file_info.iteritems():
-            for peerID in info['peers'].keys():
-                if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
-                    del info['peers'][peerID]
-                    log("Peer " + peerID + " removed from " + fileID)
+        for fileID in file_info.keys():
+            with file_info_locks[fileID]:
+                info = file_info[fileID]
+                for peerID in info['peers'].keys():
+                    if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
+                        del info['peers'][peerID]
+                        log("Peer " + peerID + " removed from " + fileID)
 
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
