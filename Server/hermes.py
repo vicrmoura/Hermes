@@ -109,33 +109,22 @@ def sample_peers(fileID, peerID, maxPeers):
              "port" : file_info[fileID]["peers"][peerid]["port"],
              "ip" : file_info[fileID]["peers"][peerid]["ip"]} 
             for peerid in result]
-    
 
-def process_heartbeat_started(fileID, peerID, port, ip):
-    process_heartbeat_downloading(fileID, peerID, port, ip)
+def process_heartbeat_active(fileID, peerID, port, ip):
+    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
 
-def process_heartbeat_stopped(fileID, peerID, port, ip):
+def process_heartbeat_inactive(fileID, peerID, port, ip):
     if peerID in file_info[fileID]["peers"]:
         del file_info[fileID]["peers"][peerID]
-
-def process_heartbeat_downloading(fileID, peerID, port, ip):
-    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
-
-def process_heartbeat_completed(fileID, peerID, port, ip):
-    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
 
 def process_heartbeat(files, peerID, port, ip, maxPeers):
     response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
         with file_info_locks[fileID]:
-            if event == "started":
-                process_heartbeat_started(fileID, peerID, port, ip)
-            elif event == "stopped":
-                process_heartbeat_stopped(fileID, peerID, port, ip)
-            elif event == "completed":
-                process_heartbeat_completed(fileID, peerID, port, ip)
-            elif event == "downloading":
-                process_heartbeat_stopped(fileID, peerID, port, ip)
+            if event == "active":
+                process_heartbeat_active(fileID, peerID, port, ip)
+            elif event == "inactive":
+                process_heartbeat_inactive(fileID, peerID, port, ip)
             response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
     return response
 
