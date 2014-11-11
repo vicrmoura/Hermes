@@ -7,19 +7,36 @@ import SocketServer
 import json
 import random
 
+#### Global Constants ####
+
 MAX_SEARCH_LIMIT = 1000
 MAX_PEERS_IN_RESPONSE = 100
 HEARTBEAT_INTERVAL = 1000
+
+#### Data Structures ####
 
 file_info = {}
 file_info_locks = {}
 search_map = {}
 # No need to lock search_map, because all access are one lined and the data structure is already locked
-
 file_id_counter = 0
 file_id_counter_lock = threading.RLock()
 
-def query_test():
+#### Logging Functions ####
+
+def log(log_message):
+    with open("/hermes/logs/log", "a") as log:
+        log.write("Server on thread {}: {}\n".format(threading.current_thread().name, log_message))
+
+def log_missing_field(field, data):
+    log("Missing field: {} from: {}".format(field, data))
+
+def log_bad_json(bad_json):
+    log("Bad json: {}".format(bad_json))
+
+#### Helper Functions ####
+
+def test_init():
     global file_info
     global search_map
     file_info = {
@@ -59,28 +76,17 @@ def current_time_ms():
 def convert_data_jsonline(data):
     return json.dumps(data, separators = (',',':'))+"\n"
 
-def log(log_message):
-    with open("/hermes/logs/log", "a") as log:
-        log.write("Server on thread {}: {}\n".format(threading.current_thread().name, log_message))
-
-def log_missing_field(field, data):
-    log("Missing field: {} from: {}".format(field, data))
-
-def log_bad_json(bad_json):
-    log("Bad json: {}".format(bad_json))
-
-def process_search_query(search_text, limit, offset):
-    match_ids = search_map[search_text.lower()][offset:min(MAX_SEARCH_LIMIT, limit)]
-    results = []
-    for i in match_ids:
-        with file_info_lock[i]:
-            results.append( {
-                    "name": file_info[i]["name"],
-                    "size": file_info[i]["size"],
-                    "fileID": i,
-                    "numOfPeers": len(file_info[i]["peers"])
-                } )
-    return {"type" : "queryResponse", "results": results}
+def check_heartbeat(wait_interval_ms):
+    while True:
+        time.sleep(wait_interval_ms/1000)
+        current_time = current_time_ms()
+        for fileID in file_info.keys():
+            with file_info_locks[fileID]:
+                info = file_info[fileID]
+                for peerID in info['peers'].keys():
+                    if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
+                        del info['peers'][peerID]
+                        log("Peer " + peerID + " removed from " + fileID)
 
 def sample_peers(fileID, peerID, maxPeers):
     if peerID in file_info[fileID]["peers"]:
@@ -109,24 +115,6 @@ def sample_peers(fileID, peerID, maxPeers):
              "port" : file_info[fileID]["peers"][peerid]["port"],
              "ip" : file_info[fileID]["peers"][peerid]["ip"]} 
             for peerid in result]
-
-def process_heartbeat_active(fileID, peerID, port, ip):
-    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
-
-def process_heartbeat_inactive(fileID, peerID, port, ip):
-    if peerID in file_info[fileID]["peers"]:
-        del file_info[fileID]["peers"][peerID]
-
-def process_heartbeat(files, peerID, port, ip, maxPeers):
-    response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
-    for fileID, event in files.iteritems():
-        with file_info_locks[fileID]:
-            if event == "active":
-                process_heartbeat_active(fileID, peerID, port, ip)
-            elif event == "inactive":
-                process_heartbeat_inactive(fileID, peerID, port, ip)
-            response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
-    return response
 
 def find_by_sha1s(pieceSize, blockSize, piecesSHA1S):
     for fileID in file_info.keys():
@@ -160,6 +148,39 @@ def generate_new_id():
         file_id_counter += 1
         return str(file_id_counter)
 
+#### Communication Processing Functions ####
+
+def process_search_query(search_text, limit, offset):
+    match_ids = search_map[search_text.lower()][offset:min(MAX_SEARCH_LIMIT, limit)]
+    results = []
+    for i in match_ids:
+        with file_info_lock[i]:
+            results.append( {
+                    "name": file_info[i]["name"],
+                    "size": file_info[i]["size"],
+                    "fileID": i,
+                    "numOfPeers": len(file_info[i]["peers"])
+                } )
+    return {"type" : "queryResponse", "results": results}
+
+def process_heartbeat_active(fileID, peerID, port, ip):
+    file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
+
+def process_heartbeat_inactive(fileID, peerID, port, ip):
+    if peerID in file_info[fileID]["peers"]:
+        del file_info[fileID]["peers"][peerID]
+
+def process_heartbeat(files, peerID, port, ip, maxPeers):
+    response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
+    for fileID, event in files.iteritems():
+        with file_info_locks[fileID]:
+            if event == "active":
+                process_heartbeat_active(fileID, peerID, port, ip)
+            elif event == "inactive":
+                process_heartbeat_inactive(fileID, peerID, port, ip)
+            response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
+    return response
+
 def process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip):
     fileID = find_by_sha1s(pieceSize, blockSize, piecesSHA1S)
     if fileID is None:
@@ -172,6 +193,7 @@ def process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip
                              "peers": {peerID: {"timestamp": current_time_ms(), "port": port, "ip": ip}}}
     return { "type": "uploadResponse", "fileID": fileID, "interval": HEARTBEAT_INTERVAL}
 
+#### Protocol Handlers ####
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
@@ -307,29 +329,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 self.request.sendall(response)
                 log("Response Sent: {}".format(response))
 
-def check_heartbeat(wait_interval_ms):
-    
-    while True:
-        time.sleep(wait_interval_ms/1000)
-        current_time = current_time_ms()
-        for fileID in file_info.keys():
-            with file_info_locks[fileID]:
-                info = file_info[fileID]
-                for peerID in info['peers'].keys():
-                    if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
-                        del info['peers'][peerID]
-                        log("Peer " + peerID + " removed from " + fileID)
-
-
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
 
 
 if __name__ == "__main__":
-    query_test()
-
     HOST, PORT = "localhost", 9999
-
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
     ip, port = server.server_address
 
