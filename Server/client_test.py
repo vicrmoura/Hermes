@@ -29,22 +29,36 @@ def heartbeat(sock, fileid, event):
     hb_time = response_data['interval']
     return response
 
-def upload(sock, fileName, pieceSize, blockSize, piecesSHA1s):
-    data = {'type': 'upload', 'fileName': fileName, 'pieceSize': pieceSize, 'blockSize': blockSize, 'piecesSHA1S': piecesSHA1s, 'peerID' : 'yyy', 'port' : 4444, 'ip' : '198.161.1.1'}
+def upload(sock, fileName, size, pieceSize, blockSize, piecesSHA1s):
+    data = {'type': 'upload',
+            'fileName': fileName,
+            'size': size, 
+            'pieceSize': pieceSize,
+            'blockSize': blockSize, 
+            'piecesSHA1S': piecesSHA1s, 
+            'peerID' : 'yyy', 
+            'port' : 4444, 
+            'ip' : '198.161.1.1'}
     return message(sock, data)
 
 def test_client(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((ip, port))
     try:
-        #query_message(sock, "SuperMan")
-        #query_message(sock, "Batman")
-        [heartbeat(sock, "1", "active") for i in range(10)]
-        heartbeat(sock, "1", "inactive")
-        #upload(sock, 'Captain America', 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
-        #upload(sock, 'Captain America', 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
-        #upload(sock, 'Captain America', 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 13]])
-
+        #[heartbeat(sock, "1", "active") for i in range(10)]
+        #heartbeat(sock, "1", "inactive")
+        upload(sock, 'Captain America', 2000000, 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
+        upload(sock, 'Captain America 2', 3000000, 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 13]])
+        upload(sock, 'The Avengers', 4000000, 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 14]])
+        upload(sock, 'The Notebook', 5000000, 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 15]])
+        upload(sock, 'Captured', 6000000, 10000, 10, [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 15]])
+        query_message(sock, "Cap")
+        query_message(sock, "Cap ame")
+        query_message(sock, "Capt america 2")
+        query_message(sock, "the")
+        query_message(sock, "the captain")
+        query_message(sock, "the aveng")
+        
     finally:
         sock.close()
 

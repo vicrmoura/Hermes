@@ -18,7 +18,7 @@ HEARTBEAT_INTERVAL = 1000
 file_info = {}
 file_info_locks = {}
 search_map = {}
-# No need to lock search_map, because all access are one lined and the data structure is already locked
+search_map_add_lock = threading.RLock()
 file_id_counter = 0
 file_id_counter_lock = threading.RLock()
 
@@ -42,24 +42,28 @@ def test_init():
     file_info = {
          "1" : { 
                 "name": "Batman Begins",
+                "size" : 100000,
                 "pieceSize": 100,
                 "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"aaa":{"timestamp": 10, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 500, "port": 6666, "ip": "11.12.13.14"}, "ccc":{"timestamp": 800, "port": 1111, "ip": "10.1.1.2"}}}, 
          "2" : {
                 "name": "Batman: The Dark Knight",
+                "size" : 100000,
                 "pieceSize": 100,
                 "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"aaa":{"timestamp": 50, "port": 3000, "ip": "161.24.24.1"}, "bbb":{"timestamp": 75, "port": 6666, "ip": "11.12.13.14"}}},
          "3" : {
                 "name": "Batman: The Dark Knight Rises",
+                "size" : 100000,
                 "pieceSize": 100,
                 "blockSize": 5,
                 "sha1s": [], 
                 "peers": {"bbb":{"timestamp": 59, "port": 6666, "ip": "11.12.13.14"}}},
          "4" : {
                 "name": "Superman",
+                "size" : 100000,
                 "pieceSize": 100,
                 "blockSize": 5,
                 "sha1s": [],
@@ -68,7 +72,7 @@ def test_init():
     for fileID in file_info:
         file_info_locks[fileID] = threading.RLock()
 
-    search_map = {"batman" : ["1", "2", "3"], "superman" : ["4"]}
+    search_map = {"batman" : {"1", "2", "3"}, "superman" : {"4"}}
 
 def current_time_ms():
     return int(time.time()*1000.0)
@@ -116,9 +120,11 @@ def sample_peers(fileID, peerID, maxPeers):
              "ip" : file_info[fileID]["peers"][peerid]["ip"]} 
             for peerid in result]
 
-def find_by_sha1s(pieceSize, blockSize, piecesSHA1S):
+def find_by_sha1s(size, pieceSize, blockSize, piecesSHA1S):
     for fileID in file_info.keys():
         with file_info_locks[fileID]:
+            if size != file_info[fileID]["size"]:
+                continue
             if pieceSize != file_info[fileID]["pieceSize"]:
                 continue
             if blockSize != file_info[fileID]["blockSize"]:
@@ -148,19 +154,42 @@ def generate_new_id():
         file_id_counter += 1
         return str(file_id_counter)
 
+def search_entries(fileName):
+    names = fileName.lower().split()
+    entries = []
+    for name in names:
+        if len(name) < 3:
+            entries.append(name)
+        else:
+            for i in range(3, len(name)+1):
+                entries.append(name[:i])
+    return entries
+
+def update_search_map(fileName, fileID):
+    entries = search_entries(fileName)
+    with search_map_add_lock:
+        for entry in entries:
+            if entry in search_map:
+                search_map[entry].add(fileID)
+            else:
+                search_map[entry] = {fileID}
+
 #### Communication Processing Functions ####
 
 def process_search_query(search_text, limit, offset):
-    match_ids = search_map[search_text.lower()][offset:min(MAX_SEARCH_LIMIT, limit)]
+    names = search_text.lower().split()
     results = []
-    for i in match_ids:
-        with file_info_lock[i]:
-            results.append( {
-                    "name": file_info[i]["name"],
-                    "size": file_info[i]["size"],
-                    "fileID": i,
-                    "numOfPeers": len(file_info[i]["peers"])
-                } )
+    matches = [search_map[name] for name in names if name in search_map]
+    if len(matches) > 0:
+        match_ids = list(set.intersection(*matches))[offset:min(MAX_SEARCH_LIMIT, limit)]
+        for i in match_ids:
+            with file_info_locks[i]:
+                results.append( {
+                        "name": file_info[i]["name"],
+                        "size": file_info[i]["size"],
+                        "fileID": i,
+                        "numOfPeers": len(file_info[i]["peers"])
+                    } )
     return {"type" : "queryResponse", "results": results}
 
 def process_heartbeat_active(fileID, peerID, port, ip):
@@ -181,16 +210,18 @@ def process_heartbeat(files, peerID, port, ip, maxPeers):
             response["peers"][fileID] = sample_peers(fileID, peerID, maxPeers)
     return response
 
-def process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip):
-    fileID = find_by_sha1s(pieceSize, blockSize, piecesSHA1S)
+def process_upload(fileName, size, pieceSize, blockSize, piecesSHA1S, peerID, port, ip):
+    fileID = find_by_sha1s(size, pieceSize, blockSize, piecesSHA1S)
     if fileID is None:
         fileID = generate_new_id()
         file_info_locks[fileID] = threading.RLock()
         file_info[fileID] = {"name": fileName,
+                             "size": size,
                              "pieceSize": pieceSize,
                              "blockSize": blockSize,
                              "sha1s": piecesSHA1S,
                              "peers": {peerID: {"timestamp": current_time_ms(), "port": port, "ip": ip}}}
+        update_search_map(fileName, fileID)
     return { "type": "uploadResponse", "fileID": fileID, "interval": HEARTBEAT_INTERVAL}
 
 #### Protocol Handlers ####
@@ -228,6 +259,11 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             return ""
         fileName = self.data["fileName"]
 
+        if "size" not in self.data:
+            log_missing_field("size", self.data)
+            return ""
+        size = self.data["size"]
+
         if "pieceSize" not in self.data:
             log_missing_field("pieceSize", self.data)
             return ""
@@ -258,7 +294,7 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             return ""
         ip = self.data["ip"]
 
-        result = process_upload(fileName, pieceSize, blockSize, piecesSHA1S, peerID, port, ip)
+        result = process_upload(fileName, size, pieceSize, blockSize, piecesSHA1S, peerID, port, ip)
         if result == "":
             return ""
         return convert_data_jsonline(result)
