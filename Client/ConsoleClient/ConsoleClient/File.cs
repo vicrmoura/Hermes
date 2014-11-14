@@ -5,7 +5,7 @@ namespace Hermes
     public enum StatusType { Completed, Downloading, Started, Paused, Canceled }
 
     [XmlType(TypeName="file")]
-    public class File
+    public class HFile
     {
         [XmlAttribute(AttributeName="name")]
         public string Name;

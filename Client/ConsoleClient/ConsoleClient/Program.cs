@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 using TSSA = System.Tuple<string, string, System.Action>;
-using SFile = System.IO.File;
 
 namespace Hermes
 {
@@ -39,7 +38,7 @@ namespace Hermes
         private static bool crawling = false;
         private static string[] input;
         private static bool quit = false;
-        private static Dictionary<string, File> files;
+        private static Dictionary<string, HFile> files;
         
         private static string TrackerIP;
         private static string TrackerPort;
@@ -101,17 +100,17 @@ namespace Hermes
             // Load database
 
             Console.Write(string.Format(" * {0,-30}", "Load database"));
-            if (SFile.Exists("database.xml"))
+            if (File.Exists("database.xml"))
             {
                 using (StreamReader sr = new StreamReader("database.xml"))
                 {
-                    XmlSerializer serializer = new XmlSerializer(typeof(File[]), new XmlRootAttribute() { ElementName = "files" });
-                    files = ((File[])serializer.Deserialize(sr)).ToDictionary(file => file.Name);
+                    XmlSerializer serializer = new XmlSerializer(typeof(HFile[]), new XmlRootAttribute() { ElementName = "files" });
+                    files = ((HFile[])serializer.Deserialize(sr)).ToDictionary(file => file.Name);
                 }
             }
             else
             {
-                files = new Dictionary<string, File>();
+                files = new Dictionary<string, HFile>();
             }
             Console.WriteLine("[OK]");
 

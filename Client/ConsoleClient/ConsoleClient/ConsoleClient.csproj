@@ -44,6 +44,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="File.cs" />
+    <Compile Include="FileManager.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="P2PClient.cs" />
     <Compile Include="P2PDownloader.cs" />
