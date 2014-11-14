@@ -128,7 +128,8 @@ namespace Hermes
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId, fileManager);
-            P2PClient p2pClient = new P2PClient("Harry", "file123", "127.0.0.1", P2PServer.SERVER_PORT, fileManager);
+            var downloader = new P2PDownloader(fileManager, "file");
+            P2PClient p2pClient = new P2PClient("Harry", downloader, "127.0.0.1", P2PServer.SERVER_PORT, fileManager);
             Console.WriteLine("[OK]");
 
             // Start heartbeat

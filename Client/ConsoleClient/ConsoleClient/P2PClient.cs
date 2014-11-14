@@ -17,17 +17,15 @@ namespace Hermes
         private Task clientTask;
         private JavaScriptSerializer jsonSerializer;
         private string myId;
-        private string fileId;
         private FileManager fileManager;
         private P2PDownloader downloader;
 
-        public P2PClient(string myId, string fileId, string ip, int port, FileManager fileManager)
+        public P2PClient(string myId, P2PDownloader downloader, string ip, int port, FileManager fileManager)
         {
             Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
-            this.fileId = fileId;
             this.fileManager = fileManager;
-            this.downloader = new P2PDownloader(fileId, fileManager);
+            this.downloader = downloader;
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
         }
@@ -44,14 +42,14 @@ namespace Hermes
             {
                 // connecting to server
                 client.Connect(serverEndPoint);
-
+                
                 NetworkStream clientStream = client.GetStream();
                 StreamReader sr = new StreamReader(clientStream);
                 StreamWriter sw = new StreamWriter(clientStream);
 
                 // Starting handshake
                 Logger.log(myId, "Starting handshake");
-                send(sw, connectMessage(fileId));
+                send(sw, connectMessage(downloader.FileId));
 
                 // Receiving handshake answer
                 string handshake = sr.ReadLine();

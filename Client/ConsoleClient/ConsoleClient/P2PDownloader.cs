@@ -8,12 +8,12 @@ namespace Hermes
 {
     class P2PDownloader
     {
-        private string fileId;
+        public string FileId { get; private set; }
         private FileManager fileManager;
 
-        public P2PDownloader(string fileId, FileManager fileManager)
+        public P2PDownloader(FileManager fileManager, string fileId)
         {
-            this.fileId = fileId;
+            this.FileId = fileId;
             this.fileManager = fileManager;
         }
 

@@ -129,8 +129,6 @@ namespace Hermes
             {
                 tcpClient.Close();
             }
-            
-            
         }
 
         dynamic connectMessage(string bitField)
