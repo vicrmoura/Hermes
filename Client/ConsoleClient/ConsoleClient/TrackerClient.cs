@@ -11,24 +11,32 @@ namespace Hermes
 {
     public class TrackerClient
     {
-        private bool newPortSpecified = false;
         private string trackerPort;
         public string TrackerPort
         {
             get { return trackerPort; }
             set { trackerPort = value; newPortSpecified = true; }
         }
-        private bool newIPSpecified = false;
         private string trackerIP;
         public string TrackerIP
         {
             get { return trackerIP; }
             set { trackerIP = value; newIPSpecified = true; }
         }
+        private int heartbeatInterval = 1000;
+        public int HeartbeatInterval
+        {
+            get;
+            private set;
+        }
 
+        private static readonly string TAG = "TrackerClient";
+        
         private TcpClient tcpClient;
         private JavaScriptSerializer jsonSerializer;
-        private static readonly string TAG = "TrackerClient";
+        private bool newIPSpecified = false;
+        private bool newPortSpecified = false;
+        private int heartbeatInterval = 1000;
 
         public TrackerClient(string ip, string port)
         {
@@ -37,7 +45,7 @@ namespace Hermes
             jsonSerializer = new JavaScriptSerializer();
         }
         
-        private void sendMessage(string data)
+        private string sendMessage(string data)
         {
             try
             {
@@ -57,28 +65,35 @@ namespace Hermes
                     tcpClient = new TcpClient(TrackerIP, port);
                     Logger.log(TAG, "Connected");
                 }
+                Stream s = null;
                 try
                 {
-                    StreamWriter sw = new StreamWriter(tcpClient.GetStream());
+                    s = tcpClient.GetStream();
+                    var sw = new StreamWriter(s);
+                    var sr = new StreamReader(s);
                     sw.AutoFlush = true;
                     Logger.log(TAG, "Ready to send data");
                     sw.WriteLine(data);
-                    Logger.log(TAG, "Data sent");
-                    sw.Close();
+                    Logger.log(TAG, "Data sent, waiting response");
+                    return sr.ReadLine();
                 }
                 catch (Exception e)
                 {
                     Logger.log(TAG, "[Error] There was a problem during tracker server communication. Message: " + e.Message);
                 }
+                finally
+                {
+                    if (s != null) s.Close();
+                }
             }
             catch (Exception e)
             {
                 Logger.log(TAG, "[Error] Cannot connect to tracker server. Message: " + e.Message);
-                Console.Write(e.Message);
             }
+            return "";
         }
 
-        public void uploadMetaInfo(HFile file, byte[][] sha1s, string peerID, string peerIP, string peerPort)
+        public string uploadMetaInfo(HFile file, byte[][] sha1s, string peerID, string peerIP, string peerPort)
         {
             var dict = new Dictionary<string, dynamic> {
                  {"type", "upload"},
@@ -88,11 +103,18 @@ namespace Hermes
                  {"blockSize", file.BlockSize},
                  {"piecesSHA1S", sha1s},
                  {"peerID", peerID},
-                 {"port", peerIP},
-                 {"ip", peerPort}
+                 {"port", peerPort},
+                 {"ip", peerIP}
             };
             Logger.log(TAG, "Starting upload of " + file.Name);
-            sendMessage(jsonSerializer.Serialize(dict));
+            string response = sendMessage(jsonSerializer.Serialize(dict));
+            if (response.Length == 0)
+            {
+                throw new IOException();
+            }
+            Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
+            HeartbeatInterval = jsonResponse["interval"];
+            return jsonResponse["fileID"];
         }
     }
 }
