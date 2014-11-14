@@ -15,13 +15,19 @@ namespace Hermes
         private static readonly string CLIENT_LOG = "CLIENT";
 
         private Task clientTask;
-        JavaScriptSerializer jsonSerializer;
-        string myId;
+        private JavaScriptSerializer jsonSerializer;
+        private string myId;
+        private string fileId;
+        private FileManager fileManager;
+        private P2PDownloader downloader;
 
-        public P2PClient(string myId, string ip, int port)
+        public P2PClient(string myId, string fileId, string ip, int port, FileManager fileManager)
         {
             Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
+            this.fileId = fileId;
+            this.fileManager = fileManager;
+            this.downloader = new P2PDownloader(fileId, fileManager);
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
         }
@@ -34,32 +40,57 @@ namespace Hermes
 
             Logger.log(myId, "Requesting connection to " + ip + ":" + port);
 
-            client.Connect(serverEndPoint);
-
-            NetworkStream clientStream = client.GetStream();
-            StreamWriter sw = new StreamWriter(clientStream);
-           
             try
             {
+                // connecting to server
+                client.Connect(serverEndPoint);
+
+                NetworkStream clientStream = client.GetStream();
+                StreamReader sr = new StreamReader(clientStream);
+                StreamWriter sw = new StreamWriter(clientStream);
+
+                // Starting handshake
                 Logger.log(myId, "Starting handshake");
-                send(sw, connectMessage());
+                send(sw, connectMessage(fileId));
+
+                // Receiving handshake answer
+                string handshake = sr.ReadLine();
+                if (handshake == null)  // disconnected
+                {
+                    throw new Exception();
+                }
+
+                var json = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(handshake);
+
+                if (json["type"] != "connect")
+                {
+                    Logger.log(myId, "Server didn't answer the handshake properly. Answer: " + handshake);
+                }
+
+                downloader.setBitField(json["bitField"]);
+
+                Logger.log(myId, "Handshake complete");
+
+                sw.Flush(); // send last messages
+                System.Threading.Thread.Sleep(1000); // waiting for last messages to be sent and read
+                clientStream.Close();
             }
             catch
             {
-               Logger.log(myId, "Connection closed by the server.");
+                Logger.log(myId, "Connection closed by the server.");
             }
-
-
-            sw.Flush(); // send last messages
-            System.Threading.Thread.Sleep(1000);
-            client.Close();
+            finally
+            {
+                client.Close();
+            }
         }
 
-        dynamic connectMessage()
+        dynamic connectMessage(string fileId)
         {
             var dict = new Dictionary<string, dynamic>();
             dict["type"] = "connect";
             dict["peerId"] = myId;
+            dict["fileId"] = fileId;
             return dict;
         }
 
@@ -67,6 +98,7 @@ namespace Hermes
         {
             string json = jsonSerializer.Serialize(dict);
             sw.WriteLine(json);
+            sw.Flush();
         }
     }
 }

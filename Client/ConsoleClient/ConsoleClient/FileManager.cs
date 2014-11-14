@@ -8,5 +8,12 @@ namespace Hermes
 {
     class FileManager
     {
+
+        public HFile getFile(string fileId)
+        {
+            var dummy = new HFile();
+            dummy.BitField = "teste";
+            return dummy;
+        }
     }
 }

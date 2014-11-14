@@ -19,16 +19,16 @@ namespace Hermes
         private TcpListener tcpListener;
         private Task listenTask;
 
+        private FileManager fileManager;
         private JavaScriptSerializer jsonSerializer;
+        private Dictionary<string /*peer id*/, P2PUploader> uploaders;
+        private string myId;
 
-        Dictionary<string /*peer id*/, P2PUploader> uploaders;
-        
-        string myId;
-
-        public P2PServer(string myId)
+        public P2PServer(string myId, FileManager fileManager)
         {
             Logger.log(SERVER_LOG, "Initializing P2P server...");
             this.myId = myId;
+            this.fileManager = fileManager;
             this.tcpListener = new TcpListener(IPAddress.Any, SERVER_PORT);
             uploaders = new Dictionary<string, P2PUploader>();
             jsonSerializer = new JavaScriptSerializer();
@@ -53,69 +53,84 @@ namespace Hermes
 
         private void handleClientComm(TcpClient tcpClient)
         {
-            // get client stream (using \n as delimiter
-            NetworkStream clientStream = tcpClient.GetStream();
-            StreamReader sr = new StreamReader(clientStream);
-            StreamWriter sw = new StreamWriter(clientStream);            
-
-            // weather the client is connected
-            bool connected = false; // initially false... waiting for initial handshake
-            string peerId; // initialized during the 'connect' message
             
-            do
+            try
             {
-                try
-                {
-                    string data = sr.ReadLine();
-                   
-                    if (data == null)  // disconnected
-                    {
-                        connected = false;
-                        break;
-                    }
+                    // get client stream (using \n as delimiter
+                NetworkStream clientStream = tcpClient.GetStream();
+                StreamReader sr = new StreamReader(clientStream);
+                StreamWriter sw = new StreamWriter(clientStream);            
 
-                    var json = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(data);
-                    switch ((string)json["type"])
+                // weather the client is connected
+                bool connected = false; // initially false... waiting for initial handshake
+                string peerId; // initialized during the 'connect' message
+                do
+                {
+                    try
                     {
-                        case "connect":
-                            peerId = json["peerId"];
-                            Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
-                            connected = true;
-                            if (peerId == myId || uploaders.ContainsKey(peerId))
-                            {
-                                Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
+                        string data = sr.ReadLine();
+                        
+                        if (data == null)  // disconnected
+                        {
+                            connected = false;
+                            break;
+                        }
+                        
+                        var json = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(data);
+                        switch ((string)json["type"])
+                        {
+                            case "connect":
+                                peerId = json["peerId"];
+                                Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
+                                connected = true;
+                                if (peerId == myId || uploaders.ContainsKey(peerId))
+                                {
+                                    Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
+                                    connected = false;
+                                }
+                                else
+                                {
+                                    Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
+                                    uploaders[peerId] = new P2PUploader(fileManager, json["fileId"]);
+                                }
+                                Logger.log(SERVER_LOG, "Answering handshake");
+                                send(sw, connectMessage(uploaders[peerId].getBitField()));
+
+                                break;
+                            case "request":
+                                break;
+                            case "cancel":
+                                break;
+                            case "close":
                                 connected = false;
-                            }
-                            else
-                            {
-                                Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
-                                uploaders[peerId] = new P2PUploader();
-                            }
-                            Logger.log(SERVER_LOG, "Answering handshake");
-                            send(sw, connectMessage(""));
-                            break;
-                        case "request":
-                            break;
-                        case "cancel":
-                            break;
-                        case "close":
-                            connected = false;
-                            break;
-                        default:
-                            connected = false;
-                            break;
+                                break;
+                            default:
+                                connected = false;
+                                break;
 
+                        }
                     }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.ToString());
-                    connected = false;
-                }
-            } while (connected);
+                    catch (Exception e)
+                    {
+                        Logger.log(SERVER_LOG, e.ToString());
+                        connected = false;
+                    }
+                } while (connected);
 
-            System.Threading.Thread.Sleep(1000);
-            tcpClient.Close();
+                sw.Flush();
+                System.Threading.Thread.Sleep(1000);
+                clientStream.Close();
+            }
+            catch (Exception e)
+            {
+                Logger.log(SERVER_LOG, e.ToString());
+            }
+            finally
+            {
+                tcpClient.Close();
+            }
+            
+            
         }
 
         dynamic connectMessage(string bitField)
@@ -130,6 +145,7 @@ namespace Hermes
         {
             string json = jsonSerializer.Serialize(dict);
             sw.WriteLine(json);
+            sw.Flush();
         }
     }
 }
