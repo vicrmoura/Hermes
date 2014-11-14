@@ -12,6 +12,8 @@ namespace Hermes
 {
     class P2PServer
     {
+        private static readonly string SERVER_LOG = "SERVER";
+
         public static readonly int SERVER_PORT = 3000;
 
         private TcpListener tcpListener;
@@ -25,6 +27,7 @@ namespace Hermes
 
         public P2PServer(string myId)
         {
+            Logger.log(SERVER_LOG, "Initializing P2P server...");
             this.myId = myId;
             this.tcpListener = new TcpListener(IPAddress.Any, SERVER_PORT);
             uploaders = new Dictionary<string, P2PUploader>();
@@ -35,12 +38,13 @@ namespace Hermes
         private void listenForClients()
         {
             this.tcpListener.Start();
+            Logger.log(SERVER_LOG, "P2P Server initialized");
 
             while (true)
             {
                 // blocks until a client has connected to the server
                 TcpClient client = this.tcpListener.AcceptTcpClient();
-
+                Logger.log(SERVER_LOG, "Accepted new client");
                 // create a thread to handle communication 
                 // with connected client
                 Task.Run(() => handleClientComm(client));
@@ -51,7 +55,8 @@ namespace Hermes
         {
             // get client stream (using \n as delimiter
             NetworkStream clientStream = tcpClient.GetStream();
-            StreamReader sr = new StreamReader(clientStream);            
+            StreamReader sr = new StreamReader(clientStream);
+            StreamWriter sw = new StreamWriter(clientStream);            
 
             // weather the client is connected
             bool connected = false; // initially false... waiting for initial handshake
@@ -73,16 +78,21 @@ namespace Hermes
                     switch ((string)json["type"])
                     {
                         case "connect":
-                            connected = true;
                             peerId = json["peerId"];
+                            Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
+                            connected = true;
                             if (peerId == myId || uploaders.ContainsKey(peerId))
                             {
+                                Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
                                 connected = false;
                             }
                             else
                             {
+                                Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
                                 uploaders[peerId] = new P2PUploader();
                             }
+                            Logger.log(SERVER_LOG, "Answering handshake");
+                            send(sw, connectMessage(""));
                             break;
                         case "request":
                             break;
@@ -106,6 +116,20 @@ namespace Hermes
 
             System.Threading.Thread.Sleep(1000);
             tcpClient.Close();
+        }
+
+        dynamic connectMessage(string bitField)
+        {
+            var dict = new Dictionary<string, dynamic>();
+            dict["type"] = "connect";
+            dict["bitField"] = bitField;
+            return dict;
+        }
+
+        void send(StreamWriter sw, dynamic dict)
+        {
+            string json = jsonSerializer.Serialize(dict);
+            sw.WriteLine(json);
         }
     }
 }

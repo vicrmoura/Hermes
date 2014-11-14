@@ -12,12 +12,15 @@ namespace Hermes
 {
     class P2PClient
     {
+        private static readonly string CLIENT_LOG = "CLIENT";
+
         private Task clientTask;
         JavaScriptSerializer jsonSerializer;
         string myId;
 
         public P2PClient(string myId, string ip, int port)
         {
+            Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
@@ -29,6 +32,8 @@ namespace Hermes
 
             IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Parse(ip), port);
 
+            Logger.log(myId, "Requesting connection to " + ip + ":" + port);
+
             client.Connect(serverEndPoint);
 
             NetworkStream clientStream = client.GetStream();
@@ -36,11 +41,12 @@ namespace Hermes
            
             try
             {
+                Logger.log(myId, "Starting handshake");
                 send(sw, connectMessage());
             }
             catch
             {
-                Console.WriteLine("[WARNING]: Connection closed by the server.");
+               Logger.log(myId, "Connection closed by the server.");
             }
 
 

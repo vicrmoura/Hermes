@@ -125,7 +125,7 @@ namespace Hermes
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId);
-            P2PClient p2pClient = new P2PClient(PeerId, "127.0.0.1", P2PServer.SERVER_PORT);
+            P2PClient p2pClient = new P2PClient("Harry", "127.0.0.1", P2PServer.SERVER_PORT);
             Console.WriteLine("[OK]");
 
             // Start heartbeat
