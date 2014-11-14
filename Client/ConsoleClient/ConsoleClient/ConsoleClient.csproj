@@ -35,6 +35,7 @@
     <Reference Include="System" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -43,6 +44,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="File.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="P2PClient.cs" />
+    <Compile Include="P2PDownloader.cs" />
+    <Compile Include="P2PServer.cs" />
+    <Compile Include="P2PUploader.cs" />
     <Compile Include="Piece.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

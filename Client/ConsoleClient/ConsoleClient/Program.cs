@@ -46,6 +46,7 @@ namespace Hermes
         private static string LocalIP;
         private static string LocalPort;
         private static string BaseFolder;
+        private static string PeerId;
         #endregion
 
         #region /* Main */
@@ -93,6 +94,8 @@ namespace Hermes
             TrackerIP = ConfigurationManager.AppSettings["TrackerIP"];
             TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
             BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
+            PeerId = ConfigurationManager.AppSettings["PeerId"];
+
             Console.WriteLine("[OK]");
 
             // Load database
@@ -121,7 +124,8 @@ namespace Hermes
             // Start p2p-server
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
-            // TODO: Start p2p-server
+            P2PServer p2pServer = new P2PServer(PeerId);
+            P2PClient p2pClient = new P2PClient(PeerId, "127.0.0.1", P2PServer.SERVER_PORT);
             Console.WriteLine("[OK]");
 
             // Start heartbeat
