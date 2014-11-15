@@ -23,5 +23,10 @@ namespace Hermes
         {
             return file.BitField;
         }
+
+        public string getBlock(int piece, int block)
+        {
+            return "dummy";
+        }
     }
 }

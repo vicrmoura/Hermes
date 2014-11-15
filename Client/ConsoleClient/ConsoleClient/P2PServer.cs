@@ -56,14 +56,14 @@ namespace Hermes
             
             try
             {
-                    // get client stream (using \n as delimiter
+                // get client stream (using \n as delimiter
                 NetworkStream clientStream = tcpClient.GetStream();
                 StreamReader sr = new StreamReader(clientStream);
                 StreamWriter sw = new StreamWriter(clientStream);            
 
                 // weather the client is connected
                 bool connected = false; // initially false... waiting for initial handshake
-                string peerId; // initialized during the 'connect' message
+                string peerId = ""; // initialized during the 'connect' message
                 do
                 {
                     try
@@ -77,35 +77,61 @@ namespace Hermes
                         }
                         
                         var json = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(data);
+                        if (!connected && json["type"] != "connect") 
+                        {
+                            Logger.log(SERVER_LOG, "First message is not a handshake: " + data);
+                            break;
+                        }
                         switch ((string)json["type"])
                         {
                             case "connect":
                                 peerId = json["peerId"];
+                                lock (chokeUnchokeLock)
+                                {
+                                    connectedPeers.Add(peerId);
+                                }
+                                maybeChokeRandomPeer();
                                 Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                 connected = true;
-                                if (peerId == myId || uploaders.ContainsKey(peerId))
+                                lock (uploaders)
                                 {
-                                    Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
-                                    connected = false;
+                                    if (peerId == myId || uploaders.ContainsKey(peerId))
+                                    {
+                                        Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
+                                        connected = false;
+                                    }
+                                    else
+                                    {
+                                        Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
+                                        uploaders[peerId] = new P2PUploader(fileManager, json["fileId"]);
+                                    }
+
+                                    Logger.log(SERVER_LOG, "Answering handshake");
+                                    send(sw, connectMessage(uploaders[peerId].getBitField()));
                                 }
-                                else
-                                {
-                                    Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
-                                    uploaders[peerId] = new P2PUploader(fileManager, json["fileId"]);
-                                }
-                                Logger.log(SERVER_LOG, "Answering handshake");
-                                send(sw, connectMessage(uploaders[peerId].getBitField()));
 
                                 break;
                             case "request":
+                                int piece = json["piece"];
+                                int block = json["block"];
+                                Logger.log(SERVER_LOG, "Client " + peerId + " requested (piece, block) = (" + piece + "," + block + ")");
+                                P2PUploader uploader;
+                                lock(uploaders)
+                                {
+                                    uploader = uploaders[peerId];
+                                }
+                                string blockData = uploader.getBlock(piece, block);
+                                send(sw, dataMessage(blockData));
                                 break;
                             case "cancel":
                                 break;
                             case "close":
                                 connected = false;
+                                Logger.log(SERVER_LOG, "Connection closed by the client");
                                 break;
                             default:
                                 connected = false;
+                                Logger.log(SERVER_LOG, "Unknown message type: " + json["type"]);
                                 break;
 
                         }
@@ -136,6 +162,14 @@ namespace Hermes
             var dict = new Dictionary<string, dynamic>();
             dict["type"] = "connect";
             dict["bitField"] = bitField;
+            return dict;
+        }
+
+        dynamic dataMessage(string data)
+        {
+            var dict = new Dictionary<string, dynamic>();
+            dict["type"] = "data";
+            dict["content"] = data;
             return dict;
         }
 

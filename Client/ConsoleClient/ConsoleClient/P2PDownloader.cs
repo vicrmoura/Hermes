@@ -21,5 +21,16 @@ namespace Hermes
         {
 
         }
+        int c = 0;
+        public Tuple<int, int> getNextBlock()
+        {
+            if (c++ == 100) return null; // for test purposes
+            return new Tuple<int, int>(c, 0);
+        }
+
+        public void addBlock(int piece, int block, string data)
+        {
+
+        }
     }
 }
