@@ -80,19 +80,18 @@ def current_time_ms():
 def convert_data_jsonline(data):
     return json.dumps(data, separators = (',',':'))+"\n"
 
-def check_heartbeat(wait_interval_ms):
-    while True:
-        time.sleep(wait_interval_ms/1000)
-        current_time = current_time_ms()
-        for fileID in file_info.keys():
-            with file_info_locks[fileID]:
-                info = file_info[fileID]
-                for peerID in info['peers'].keys():
-                    if current_time - info['peers'][peerID]['timestamp'] > wait_interval_ms:
-                        del info['peers'][peerID]
-                        log("Peer " + peerID + " removed from " + fileID)
+def check_heartbeat(fileID):
+    current_time = current_time_ms()
+    info = file_info[fileID]
+    for peerID in info['peers'].keys():
+        if current_time - info['peers'][peerID]['timestamp'] > 2*HEARTBEAT_INTERVAL:
+            del info['peers'][peerID]
+            log("Peer " + peerID + " removed from " + fileID)
 
 def sample_peers(fileID, peerID, maxPeers):
+    
+    check_heartbeat(fileID)
+
     if peerID in file_info[fileID]["peers"]:
         peer_entry = file_info[fileID]["peers"][peerID]
         del file_info[fileID]["peers"][peerID]
@@ -198,6 +197,8 @@ def process_heartbeat_active(fileID, peerID, port, ip):
 def process_heartbeat_inactive(fileID, peerID, port, ip):
     if peerID in file_info[fileID]["peers"]:
         del file_info[fileID]["peers"][peerID]
+        log("Peer " + peerID + " removed from " + fileID)
+
 
 def process_heartbeat(files, peerID, port, ip, maxPeers):
     response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
@@ -229,10 +230,10 @@ def process_upload(fileName, size, pieceSize, blockSize, piecesSHA1S, peerID, po
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
 
     def handle_search_query(self):
-        if "string" not in self.data:
-            log_missing_field("string", self.data)
+        if "name" not in self.data:
+            log_missing_field("name", self.data)
             return ""
-        search_text = self.data["string"]
+        search_text = self.data["name"]
 
         limit = MAX_SEARCH_LIMIT
         if "limit" in self.data:
@@ -336,7 +337,12 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
     def handle(self):
         
         while True:
-            message = self.rfile.readline()
+            try:
+                message = self.rfile.readline()
+            except Exception:
+                log ("Connection reset by peer")
+                break    
+
             if message == "":
                 break
             message = message.strip()
@@ -370,15 +376,16 @@ class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
 
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 9999
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(('8.8.8.8', 80))
+    HOST, PORT = s.getsockname()[0], 9999
+    s.close()
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
     ip, port = server.server_address
 
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = False
     server_thread.start()
-
-    heartbeat_thread = threading.Thread(target=check_heartbeat, args = [2*HEARTBEAT_INTERVAL])
-    heartbeat_thread.start()
 
     log("Started")
