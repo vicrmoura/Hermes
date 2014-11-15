@@ -12,7 +12,7 @@ namespace Hermes
         public HFile getFile(string fileId)
         {
             var dummy = new HFile();
-            dummy.BitField = "teste";
+            dummy.BitField = "test";
             return dummy;
         }
 
