@@ -97,6 +97,10 @@ namespace Hermes
             TrackerIP = ConfigurationManager.AppSettings["TrackerIP"];
             TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
             BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
+            if (!Directory.Exists(BaseFolder))
+            {
+                Directory.CreateDirectory(BaseFolder);
+            }
             PeerId = ConfigurationManager.AppSettings["PeerId"];
             if (PeerId == "")
             {
