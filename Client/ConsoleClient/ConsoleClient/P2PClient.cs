@@ -75,7 +75,7 @@ namespace Hermes
                     Logger.log(logLabel, "Server didn't answer the handshake properly. Answer: " + handshake);
                 }
 
-                downloader.SetBitField(json["bitField"]);
+                downloader.SetBitField(myId, json["bitField"]);
 
                 Logger.log(logLabel, "Handshake complete");
 

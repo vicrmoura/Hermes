@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections;
 
 namespace Hermes
 {
@@ -16,6 +17,8 @@ namespace Hermes
         private HFile hfile;
         private string filePath;
 
+        Dictionary<string/*peerId*/, BitArray> bitFields;
+
         /* Constructor */
 
         public P2PDownloader(string fileID, HFile hfile)
@@ -23,6 +26,7 @@ namespace Hermes
             this.FileID = fileID;
             this.hfile = hfile;
             this.filePath = Path.Combine(Program.BaseFolder, hfile.Name + ".downloading");
+            this.bitFields = new Dictionary<string, BitArray>();
 
             lock (hfile)
             {
@@ -38,10 +42,10 @@ namespace Hermes
 
         /* Methods */
 
-        public void SetBitField(string bitField)
+        public void SetBitField(string peerName, string bitField)
         {
-            // TODO(luizmramos): Tambem receber nome do cliente (um bitfield por client)
-            // TODO: this.bitField = bitfield (trocar de string pra mapa)
+            byte[] bitFieldData = Convert.FromBase64String(bitField);
+            bitFields[peerName] = new BitArray(bitFieldData);
         }
         int c = 0;
         public Tuple<int, int> GetNextBlock()
@@ -56,6 +60,7 @@ namespace Hermes
             if (data == "dummy") return;
             throw new InvalidOperationException("Caguei pra voce croata. E sim! Essa exceção eh so pra sugar!");
             
+            // TODO(felipe): essa função nao é thread safe, mas deveria ser
             using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.Write))
             {
                 byte[] byteData = Convert.FromBase64String(data);
