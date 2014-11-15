@@ -98,14 +98,8 @@ namespace Hermes
                             switch ((string)json["type"])
                             {
                                 case "connect":
-                                    peerId = json["peerId"];
-                                    lock (chokeUnchokeLock)
-                                    {
-                                        connectedPeers.Add(peerId);
-                                    }
-                                    qtd[peerId] = 0;
-                                    myChokeState = false;
-                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!
+                                    string fileId = json["fileId"];
+                                    peerId = json["peerId"] + "#" + fileId; // # is a forbidden character for fileId and peerId
                                     Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                     connected = true;
                                     lock (uploaders)
@@ -118,12 +112,21 @@ namespace Hermes
                                         else
                                         {
                                             Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
-                                            uploaders[peerId] = new P2PUploader(fileManager, json["fileId"]);
+                                            uploaders[peerId] = new P2PUploader(fileManager, fileId);
                                         }
 
                                         Logger.log(SERVER_LOG, "Answering handshake");
                                         send(sw, connectMessage(uploaders[peerId].getBitField()));
                                     }
+                                    if (!connected) break;
+
+                                    lock (chokeUnchokeLock)
+                                    {
+                                        connectedPeers.Add(peerId);
+                                    }
+                                    qtd[peerId] = 0;
+                                    myChokeState = false;
+                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!
 
                                     break;
                                 case "request":
