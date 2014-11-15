@@ -137,6 +137,7 @@ namespace Hermes
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId, files);
 
+
             Console.WriteLine("[OK]");
 
             // Start crawling BaseFolder
@@ -394,15 +395,30 @@ namespace Hermes
         // TODO: ExecuteExecutewnload
         private static void ExecuteDownload(uint id)
         {
-            if (input.Length == 2)
-            {
-                string fileID = searchResults[id]["fileID"];
-                Console.WriteLine("Started download of " + id);
-            }
-            else
+            if (input.Length != 2)
             {
                 Console.WriteLine("Missing fileID");
+                return;
             }
+
+            // dummies and more dummies
+            Dictionary<string, string> x = new Dictionary<string, string>();
+            x["peerId"] = "Harry1";
+            x["ip"] = "127.0.0.1";
+            x["port"] = P2PServer.SERVER_PORT + "";
+            Dictionary<string, string> y = new Dictionary<string, string>();
+            y["peerId"] = "Harry2";
+            y["ip"] = "127.0.0.1";
+            y["port"] = P2PServer.SERVER_PORT + "";
+            List<Dictionary<string, string>> peers = new List<Dictionary<string, string>>();
+            peers.Add(x);
+            peers.Add(y);
+            // end of dummies
+
+            //downloadManager.startDownload(input[1]);
+
+           // Console.WriteLine("Started download of " + fileId
+            
         }
 
         // TODO: ExecutePause

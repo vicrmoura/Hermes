@@ -21,15 +21,22 @@ namespace Hermes
         private P2PDownloader downloader;
         private bool isDownloading;
         private string logLabel;
-        bool choked;
+        private bool choked;
+        private string serverId;
+        private bool paused;
+        private object unpauseCv;
 
-        public P2PClient(string myId, P2PDownloader downloader, string ip, int port)
+
+        public P2PClient(string myId, string serverId, P2PDownloader downloader, string ip, int port)
         {
             Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
+            this.serverId = serverId;
             this.downloader = downloader;
             this.isDownloading = false;
             this.choked = false;
+            this.paused = false;
+            this.unpauseCv = new object();
             this.logLabel = myId + ":" + downloader.FileID;
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
@@ -73,7 +80,7 @@ namespace Hermes
                     Logger.log(logLabel, "Server didn't answer the handshake properly. Answer: " + handshake);
                 }
 
-                downloader.SetBitField(myId, json["bitField"]);
+                downloader.SetBitField(serverId, json["bitField"]);
 
                 Logger.log(logLabel, "Handshake complete");
 
@@ -85,13 +92,27 @@ namespace Hermes
                 System.Threading.Thread.Sleep(30000);
                 while (isDownloading)
                 {
-                    lock (unchokeCv)
+
+                    if (paused) // dont lock on every iteration
                     {
-                        if (choked)
+                        lock (unpauseCv)
                         {
-                            Logger.log(myId, "Can't send new request because I'm choked. Starting long sleep");
-                            Monitor.Wait(unchokeCv);
-                            Logger.log(myId, "Waking up. Good morning!");
+                            while (paused) // prevent deadlock
+                            {
+                                Monitor.Wait(unpauseCv);
+                            }
+                        }
+                    }
+                    if (choked)
+                    {
+                        lock (unchokeCv)
+                        {
+                            while (choked)
+                            {
+                                Logger.log(myId, "Can't send new request because I'm choked. Starting long sleep");
+                                Monitor.Wait(unchokeCv);
+                                Logger.log(myId, "Waking up. Good morning!");
+                            }
                         }
                     }
 
@@ -177,8 +198,11 @@ namespace Hermes
                             Logger.log(myId, "Being unchoked");
                             lock(unchokeCv)
                             {
-                                choked = false;
-                                Monitor.Pulse(unchokeCv);
+                                if (choked)
+                                {
+                                    choked = false;
+                                    Monitor.Pulse(unchokeCv);
+                                }
                             }
                             
                             break;
@@ -197,6 +221,19 @@ namespace Hermes
                     Logger.log(logLabel, e.ToString());
                     isDownloading = false;
                 }
+            }
+            // making sure the other thread finishes
+            lock (unchokeCv) 
+            {
+                if (choked)
+                {
+                    choked = false;
+                    Monitor.Pulse(unchokeCv);
+                }
+            }
+            lock (requesterCv)
+            {
+                Monitor.Pulse(requesterCv);
             }
         }
 
@@ -230,6 +267,29 @@ namespace Hermes
             string json = jsonSerializer.Serialize(dict);
             sw.WriteLine(json);
             sw.Flush();
+        }
+
+        public void pause()
+        {
+            paused = true;
+        }
+
+        public void unpause()
+        {
+            lock (unpauseCv)
+            {
+                if (paused)
+                {
+                    paused = false;
+                    Monitor.Pulse(unpauseCv);
+                }
+            }
+        }
+
+        public void cancel()
+        {
+            isDownloading = false;
+            unpause();
         }
     }
 }

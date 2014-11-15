@@ -11,6 +11,7 @@ namespace Hermes
     {       
         public static void log(string label, string text)
         {
+            if (label == "TrackerClient") return;
             System.Diagnostics.Trace.WriteLine(string.Format("{0} >> [{1}] {2}", DateTime.Now.ToString("HH:mm:ss"), label, text));
         }
     }

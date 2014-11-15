@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DownloadManager.cs" />
     <Compile Include="File.cs" />
     <Compile Include="Logger.cs" />
     <Compile Include="P2PClient.cs" />

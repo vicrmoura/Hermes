@@ -63,6 +63,11 @@ namespace Hermes
             return null;
         }
 
+        public void cancel()
+        {
+
+        }
+
         /// <summary>
         /// Adds a block data to the local file
         /// </summary>
