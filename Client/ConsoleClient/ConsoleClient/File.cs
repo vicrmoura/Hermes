@@ -11,16 +11,16 @@ namespace Hermes
         public string Name;
 
         [XmlAttribute(AttributeName = "size")]
-        public uint Size;
+        public long Size;
 
         [XmlAttribute(AttributeName = "fileID")]
         public string ID;
 
         [XmlAttribute(AttributeName = "pieceSize")]
-        public uint PieceSize;
+        public int PieceSize;
 
         [XmlAttribute(AttributeName = "blockSize")]
-        public uint BlockSize;
+        public int BlockSize;
 
         [XmlAttribute(AttributeName = "status")]
         public StatusType Status;

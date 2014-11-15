@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
+using System.Security.Cryptography;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -15,6 +16,7 @@ namespace Hermes
     class Program
     {
         #region /* Constants */
+        private const int kB = 1024;
         private const string spaces = "\n                         ";
         private static readonly IReadOnlyDictionary<string, TSSA> options = new ReadOnlyDictionary<string, TSSA>(new Dictionary<string, TSSA>
         {
@@ -35,7 +37,6 @@ namespace Hermes
 
         #region /* Fields */
         private static Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-        private static bool crawling = false;
         private static string[] input;
         private static bool quit = false;
         private static Dictionary<string, HFile> files;
@@ -105,7 +106,7 @@ namespace Hermes
                 using (StreamReader sr = new StreamReader("database.xml"))
                 {
                     XmlSerializer serializer = new XmlSerializer(typeof(HFile[]), new XmlRootAttribute() { ElementName = "files" });
-                    files = ((HFile[])serializer.Deserialize(sr)).ToDictionary(file => file.Name);
+                    files = ((HFile[])serializer.Deserialize(sr)).ToDictionary(file => file.ID);
                 }
             }
             else
@@ -113,13 +114,7 @@ namespace Hermes
                 files = new Dictionary<string, HFile>();
             }
             Console.WriteLine("[OK]");
-
-            // Start crawling BaseFolder
-
-            Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
-            StartCrawlingBaseFolder();
-            Console.WriteLine("[OK]");
-
+            
             // Initializing file manager (faz isso a onde vc quiser croata)
 
             FileManager fileManager = new FileManager();
@@ -132,6 +127,12 @@ namespace Hermes
             P2PClient p2pClient = new P2PClient("Harry", downloader, "127.0.0.1", P2PServer.SERVER_PORT, fileManager);
             Console.WriteLine("[OK]");
 
+            // Start crawling BaseFolder
+
+            Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
+            StartCrawlingBaseFolder();
+            Console.WriteLine("[OK]");
+
             // Start heartbeat
 
             Console.Write(string.Format(" * {0,-30}", "Start heartbeat"));
@@ -139,25 +140,47 @@ namespace Hermes
             Console.WriteLine("[OK]");
         }
 
-        // TODO: StartCrawlingBaseFolder
         private static void StartCrawlingBaseFolder()
         {
-            if (crawling)
+            var fileNames = new HashSet<string>();
+            foreach (var file in files.Values)
             {
-                return;
+                fileNames.Add(file.Name);
             }
-
-            crawling = true;
-
-            Task.Run(() => {
-                foreach (string filePath in Directory.EnumerateFiles(BaseFolder))
+            SHA1 shaConverter = new SHA1CryptoServiceProvider();
+            TrackerClient client = new TrackerClient(TrackerIP, TrackerPort);
+            foreach (string filePath in Directory.EnumerateFiles(BaseFolder))
+            {
+                string fileName = Path.GetFileName(filePath);
+                if (!fileNames.Contains(fileName)) // fileName is not yet synchronized by this program => create metainfo then update it to tracker
                 {
-                    if (!files.ContainsKey(filePath))
+                    HFile file = new HFile();
+                    file.Name = fileName;
+                    file.Status = StatusType.Completed;
+                    file.PercentageSpecified = false;
+                    file.Size = new FileInfo(filePath).Length;
+                    file.PieceSize = (int)Math.Max(2*kB, file.Size/(10*kB));
+                    file.BlockSize = Math.Max(1*kB, file.PieceSize / 100);
+
+                    FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                    byte[] buffer = new byte[file.PieceSize];
+                    int N = (int)Math.Ceiling(1.0 * file.Size/file.PieceSize);
+                    file.Pieces = new Piece[N];
+                    for (int i = 0; i < N; i++)
                     {
-                        // TODO: Create metainfo for that file
+                        int bytesRead = fs.Read(buffer, 0, file.PieceSize);
+                        byte[] sha = shaConverter.ComputeHash(buffer, 0, bytesRead);
+                        file.Pieces[i] = new Piece(Convert.ToBase64String(sha));
+                        if (bytesRead != file.PieceSize)
+                        {
+                            file.Pieces[i].Size = bytesRead;
+                        }
                     }
+                    string fileID = client.UploadMetaInfo(file, null, PeerId, LocalIP, LocalPort);
+                    file.ID = fileID;
+                    files[fileID] = file;
                 }
-            });
+            }
         }
         #endregion
 
