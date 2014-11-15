@@ -141,8 +141,35 @@ namespace Hermes
                 throw new IOException();
             }
             Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
-            Logger.log(TAG, "Search of " + fileName + " successfully concluded.");
+            Logger.log(TAG, "Search of " + fileName + " successfully concluded, " + jsonResponse["results"].Count + " results received.");
             return jsonResponse["results"]; 
+        }
+
+
+        public Dictionary<string, dynamic> Heartbeat(Dictionary<string, string> fileStats, string peerID, string peerIP, string peerPort, int maxPeers = 0)
+        {
+            var dict = new Dictionary<string, dynamic> {
+                 {"type", "heartbeat"},
+                 {"files", fileStats},
+                 {"peerID", peerID},
+                 {"port", peerPort},
+                 {"ip", peerIP},
+            };
+            if (maxPeers > 0)
+            {
+                dict.Add("maxPeers", maxPeers);    
+            }
+            Logger.log(TAG, "Sending Heartbeat of " + fileStats.Count + " file(s)");
+            string response = SendMessage(jsonSerializer.Serialize(dict));
+            if (response == null)
+            {
+                throw new IOException();
+            }
+            Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
+            HeartbeatInterval = jsonResponse["interval"];
+            Logger.log(TAG, "Heartbeat successfully concluded.");
+            Dictionary<string, dynamic> peers = jsonResponse["peers"];
+            return jsonResponse["peers"];
         }
     }
 }
