@@ -95,6 +95,13 @@ namespace Hermes
             TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
             BaseFolder = ConfigurationManager.AppSettings["BaseFolder"];
             PeerId = ConfigurationManager.AppSettings["PeerId"];
+            if (PeerId == "")
+            {
+                PeerId = Guid.NewGuid().ToString();
+                config.AppSettings.Settings["PeerId"].Value = PeerId;
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection(config.AppSettings.SectionInformation.Name);
+            }
 
             Console.WriteLine("[OK]");
 
