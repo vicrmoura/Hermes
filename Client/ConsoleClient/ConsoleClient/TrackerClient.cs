@@ -99,7 +99,7 @@ namespace Hermes
             return null;
         }
 
-        public string UploadMetaInfo(HFile file, byte[][] sha1s, string peerID, string peerIP, string peerPort)
+        public string UploadMetaInfo(HFile file, string[] sha1s, string peerID, string peerIP, string peerPort)
         {
             var dict = new Dictionary<string, dynamic> {
                  {"type", "upload"},
