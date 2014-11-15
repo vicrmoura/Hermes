@@ -179,7 +179,14 @@ namespace Hermes
                 {
                     Thread.Sleep(trackerClient.HeartbeatInterval);
                     Dictionary<string, HFile> currentFiles = fileManager.getFiles();
-                    if (currentFiles.Count > 0) trackerClient.Heartbeat(currentFiles, PeerId, LocalIP, LocalPort);
+                    if (currentFiles.Count > 0)
+                    {
+                        try
+                        {
+                            trackerClient.Heartbeat(currentFiles, PeerId, LocalIP, LocalPort);
+                        }
+                        catch (Exception) { }
+                    }
                 }
             });          
             Console.WriteLine("[OK]");
