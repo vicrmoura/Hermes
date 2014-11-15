@@ -9,14 +9,12 @@ namespace Hermes
     class P2PUploader
     {
         private string fileId;
-        private FileManager fileManager;
         private HFile file;
 
-        public P2PUploader(FileManager fileManager, string fileId)
+        public P2PUploader(string fileId, HFile hfile)
         {
-            this.fileManager = fileManager;
             this.fileId = fileId;
-            this.file = fileManager.getFile(fileId);
+            this.file = hfile;
         }
 
         public bool fileExists()

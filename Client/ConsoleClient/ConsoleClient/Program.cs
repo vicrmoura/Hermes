@@ -41,7 +41,6 @@ namespace Hermes
         private static bool quit = false;
         private static Dictionary<string, HFile> files;
         private static TrackerClient trackerClient;
-        private static FileManager fileManager;
         
         private static string TrackerIP;
         private static string TrackerPort;
@@ -133,10 +132,6 @@ namespace Hermes
             }
             Console.WriteLine("[OK]");
             
-            // Initializing file manager (faz isso a onde vc quiser croata)
-
-            fileManager = new FileManager();
-
             // Dummy
             files["file"] = new HFile();
             files["file"].Name = "file.txt";
@@ -154,7 +149,7 @@ namespace Hermes
             // Start p2p-server
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
-            P2PServer p2pServer = new P2PServer(PeerId, fileManager);
+            P2PServer p2pServer = new P2PServer(PeerId, files);
             var downloader = new P2PDownloader("file", files["file"]);
 
             // Dummy
@@ -164,7 +159,7 @@ namespace Hermes
 
             for (int i = 0; i < 20; i++)
             {
-                P2PClient p2pClient = new P2PClient("Harry" + i, downloader, "127.0.0.1", P2PServer.SERVER_PORT, fileManager);
+                P2PClient p2pClient = new P2PClient("Harry" + i, downloader, "127.0.0.1", P2PServer.SERVER_PORT);
             }
             Console.WriteLine("[OK]");
 
@@ -233,7 +228,7 @@ namespace Hermes
                                 file.Pieces[i].Size = bytesRead;
                             }
                         }
-                        string fileID = client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                        string fileID = "dummy"; // client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
                         file.ID = fileID;
                         files[fileID] = file;   
                     }

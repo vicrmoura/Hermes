@@ -18,17 +18,15 @@ namespace Hermes
         private Task clientTask;
         private JavaScriptSerializer jsonSerializer;
         private string myId;
-        private FileManager fileManager;
         private P2PDownloader downloader;
         private bool isDownloading;
         private string logLabel;
         bool choked;
 
-        public P2PClient(string myId, P2PDownloader downloader, string ip, int port, FileManager fileManager)
+        public P2PClient(string myId, P2PDownloader downloader, string ip, int port)
         {
             Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
-            this.fileManager = fileManager;
             this.downloader = downloader;
             this.isDownloading = false;
             this.choked = false;

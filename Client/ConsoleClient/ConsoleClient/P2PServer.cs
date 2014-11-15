@@ -23,7 +23,7 @@ namespace Hermes
         private TcpListener tcpListener;
         private Task listenTask;
 
-        private FileManager fileManager;
+        private Dictionary<string, HFile> files;
         private JavaScriptSerializer jsonSerializer;
         private Dictionary<string /*peer id*/, P2PUploader> uploaders;
         private string myId;
@@ -33,11 +33,11 @@ namespace Hermes
         private object chokeUnchokeLock = new object();
         Random random = new Random();
 
-        public P2PServer(string myId, FileManager fileManager)
+        public P2PServer(string myId, Dictionary<string, HFile> files)
         {
             Logger.log(SERVER_LOG, "Initializing P2P server...");
             this.myId = myId;
-            this.fileManager = fileManager;
+            this.files = files;
             this.tcpListener = new TcpListener(IPAddress.Any, SERVER_PORT);
             this.chokedSet = new HashSet<string>();
             this.connectedPeers = new List<string>();
@@ -113,7 +113,7 @@ namespace Hermes
                                         else
                                         {
                                             Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
-                                            uploaders[peerId] = new P2PUploader(fileManager, fileId);
+                                            uploaders[peerId] = new P2PUploader(fileId, files[fileId]);
                                         }
                                         if (!uploaders[peerId].fileExists())
                                         {
