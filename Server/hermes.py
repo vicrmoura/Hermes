@@ -6,6 +6,8 @@ import time
 import SocketServer
 import json
 import random
+import sha
+import base64
 
 #### Global Constants ####
 
@@ -19,8 +21,6 @@ file_info = {}
 file_info_locks = {}
 search_map = {}
 search_map_add_lock = threading.RLock()
-file_id_counter = 0
-file_id_counter_lock = threading.RLock()
 
 #### Logging Functions ####
 
@@ -133,25 +133,15 @@ def find_by_sha1s(size, pieceSize, blockSize, piecesSHA1S):
                 continue
             similar = True
             for i in range(len(piecesSHA1S)):
-                if len(piecesSHA1S[i]) != 4:
-                    log("piece SHA1 with wrong size")
+                if piecesSHA1S[i] != filesha1s[i]:
                     similar = False
-                    break
-                for j in range(4):
-                    if piecesSHA1S[i][j] != filesha1s[i][j]:
-                        similar = False
-                        break
-                if not similar:
                     break
             if similar:
                 return fileID
     return None
 
-def generate_new_id():
-    with file_id_counter_lock:
-        global file_id_counter
-        file_id_counter += 1
-        return str(file_id_counter)
+def generate_new_id(piecesSHA1S):
+    return base64.b64encode(sha.new("".join(piecesSHA1S)).digest())
 
 def search_entries(fileName):
     names = fileName.lower().split()
@@ -214,7 +204,7 @@ def process_heartbeat(files, peerID, port, ip, maxPeers):
 def process_upload(fileName, size, pieceSize, blockSize, piecesSHA1S, peerID, port, ip):
     fileID = find_by_sha1s(size, pieceSize, blockSize, piecesSHA1S)
     if fileID is None:
-        fileID = generate_new_id()
+        fileID = generate_new_id(piecesSHA1S)
         file_info_locks[fileID] = threading.RLock()
         file_info[fileID] = {"name": fileName,
                              "size": size,
