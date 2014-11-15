@@ -84,7 +84,7 @@ namespace Hermes
                 
                 isDownloading = true;
                 Task t = Task.Run(() => clientListener(sr, sw, cv, unchokeCv));
-                
+                System.Threading.Thread.Sleep(30000);
                 while (isDownloading)
                 {
                     lock (unchokeCv)
@@ -112,10 +112,10 @@ namespace Hermes
 
                     Logger.log(logLabel, "Requesting (piece, block) = (" + piece + ", " + block + ")");
                     var message = requestMessage(piece, block);
-                    send(sw, message);
-                    
+
                     lock (cv)
                     {
+                        send(sw, message);                    
                         Monitor.Wait(cv); // waiting server to answer
                     }
                 }

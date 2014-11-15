@@ -53,6 +53,7 @@ namespace Hermes
 
         public void AddBlock(int piece, int block, string data)
         {
+            return;
             using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.Write))
             {
                 byte[] byteData = Convert.FromBase64String(data);

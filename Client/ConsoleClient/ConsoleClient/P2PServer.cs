@@ -97,12 +97,12 @@ namespace Hermes
                             {
                                 case "connect":
                                     peerId = json["peerId"];
-                                    lock (chokeUnchokeLock)
+                                    /*lock (chokeUnchokeLock)
                                     {
                                         connectedPeers.Add(peerId);
                                     }
                                     myChokeState = false;
-                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!
+                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!*/
                                     Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                     connected = true;
                                     lock (uploaders)
@@ -154,7 +154,7 @@ namespace Hermes
                         }
 
                         // if choke state changed, send message
-                        bool shouldBeChoked;
+                        /*bool shouldBeChoked;
                         lock(chokeUnchokeLock)
                         {
                             shouldBeChoked = chokedSet.Contains(peerId);
@@ -168,7 +168,7 @@ namespace Hermes
                         {
                             myChokeState = true;
                             send(sw, chokeMessage());
-                        }
+                        }*/
 
                     }
                     catch (Exception e)
@@ -179,7 +179,7 @@ namespace Hermes
                 } while (connected);
 
                 // unchoke someone if I was unchoked because i am leaving
-                lock (chokeUnchokeLock)
+                /*lock (chokeUnchokeLock)
                 {
                     connectedPeers.Remove(peerId);
                     if (chokedSet.Contains(peerId))
@@ -190,7 +190,7 @@ namespace Hermes
                     {
                         unchokeRandomPeer();
                     }
-                }
+                }*/
 
                 sw.Flush();
                 System.Threading.Thread.Sleep(1000); // wait for last messages to be sent and read
@@ -238,6 +238,7 @@ namespace Hermes
 
         void maybeChokeRandomPeer()
         {
+            return;
             lock (chokeUnchokeLock)
             {
                 if (connectedPeers.Count - chokedSet.Count > MAX_UNCHOKED)
@@ -250,6 +251,7 @@ namespace Hermes
         // not thread safe
         void chokeRandomPeer()
         {
+            return;
             while (true)
             {
                 int toChoke = random.Next() % connectedPeers.Count;
@@ -265,6 +267,7 @@ namespace Hermes
         // not thread safe
         void unchokeRandomPeer()
         {
+            return;
             if (chokedSet.Count == 0) return;
             while (true)
             {
@@ -300,9 +303,7 @@ namespace Hermes
         void send(StreamWriter sw, dynamic dict)
         {
             string json = jsonSerializer.Serialize(dict);
-            Logger.log(SERVER_LOG, "Sending" + json);
             sw.WriteLine(json);
-            Logger.log(SERVER_LOG, "Data Sent");
             sw.Flush();
         }
     }
