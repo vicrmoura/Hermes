@@ -27,8 +27,15 @@ namespace Hermes
             return file.BitField;
         }
 
+        /// <summary>
+        /// Returns block data in base64
+        /// </summary>
+        /// <param name="piece">Piece index</param>
+        /// <param name="block">Block index</param>
+        /// <returns>Block data in base64</returns>
         public string getBlock(int piece, int block)
         {
+            // TODO(felipe)
             return "dummy";
         }
     }

@@ -67,7 +67,7 @@ namespace Hermes
         {
             try
             {
-                // get client stream (using \n as delimiter
+                // get client stream (using \n as delimiter)
                 NetworkStream clientStream = tcpClient.GetStream();
                 StreamReader sr = new StreamReader(clientStream);
                 StreamWriter sw = new StreamWriter(clientStream);            
@@ -182,6 +182,8 @@ namespace Hermes
                             Logger.log(SERVER_LOG, "Choking " + peerId + " [" + qtd[peerId] + " request messages]");
                             send(sw, chokeMessage());
                         } 
+
+                        // Send Have message
 
                     }
                     catch (Exception e)
@@ -310,11 +312,17 @@ namespace Hermes
             }
         }
 
-        void send(StreamWriter sw, dynamic dict)
+        private void send(StreamWriter sw, dynamic dict)
         {
             string json = jsonSerializer.Serialize(dict);
             sw.WriteLine(json);
             sw.Flush();
+        }
+
+        public void SendHave(HFile hfile, int piece)
+        {
+            // TODO (harry): adicionar na fila concorrente
+            throw new NotImplementedException();
         }
     }
 }
