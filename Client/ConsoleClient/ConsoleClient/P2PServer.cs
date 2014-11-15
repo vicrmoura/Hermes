@@ -143,7 +143,7 @@ namespace Hermes
                                     string blockData = uploader.getBlock(piece, block);
                                     send(sw, dataMessage(blockData));
                                     break;
-                                //case "cancel": // for now caga
+                                //case "cancel": // for now caga    
                                   //  break;
                                 case "close":
                                     connected = false;
