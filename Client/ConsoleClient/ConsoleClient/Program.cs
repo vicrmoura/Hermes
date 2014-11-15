@@ -27,7 +27,6 @@ namespace Hermes
             { "stats",    new TSSA("",            "Statistics: total downloading files, total uploading" + spaces + "files, total connections", ExecuteStats) },
             { "base",     new TSSA("[<path>]",    "Show [or set] BaseFolder", ExecuteBase) },
             { "ip",       new TSSA("[<ip:port>]", "Show [or set] local IP and port", ExecuteIP) },
-            { "download", new TSSA("<fileID>",    "Start downloading <fileID>", ExecuteDownload) },
             { "pause",    new TSSA("<fileID>",    "Pause downloading <fileID>", ExecutePause) },
             { "continue", new TSSA("<fileID>",    "Continue downloading <fileID>", ExecuteContinue) },
             { "cancel",   new TSSA("<fileID>",    "Cancel download of <fileID>", ExecuteCancel) },
@@ -41,7 +40,8 @@ namespace Hermes
         private static bool quit = false;
         private static Dictionary<string, HFile> files;
         private static TrackerClient trackerClient;
-        
+        private static Dictionary<string, dynamic>[] searchResults;
+
         private static string TrackerIP;
         private static string TrackerPort;
         private static string LocalIP;
@@ -211,21 +211,100 @@ namespace Hermes
                 }
             }
         }
-        
-        private static void TrackerTest()
+
+        private static void RunSearchCommandLine()
         {
-            HFile testFile = new HFile();
-            testFile.Name = "Captain America";
-            testFile.PieceSize = 10000;
-            testFile.BlockSize = 10;
-            testFile.Size = 123456789;
-            string a = Convert.ToBase64String(new byte[] {3, 56, 255, 30});
-            string b = Convert.ToBase64String(new byte[] {1, 2, 3, 4});
-            string[] sha1s = new string[]{ a, b };
-            testFile.ID = trackerClient.UploadMetaInfo(testFile, PeerId, LocalIP, LocalPort);
-            trackerClient.UploadMetaInfo(testFile, "Dhalsim", "ip", "port");
-            trackerClient.Query("capt am", 10, 0);
+            uint limit = 10, offset = 0;
+            uint page = 1;
+            searchResults = trackerClient.Query(input[1], limit, offset);
+            bool printTable = true;
+            string command;
+            do
+            {
+                if (searchResults.Length > 0)
+                {
+                    if (printTable)
+                    {
+                        Console.WriteLine("Page " + page + " of results for " + input[1] + ":");
+                        Console.WriteLine("|- ID -|----- Name -----|----- Size -----|- Peers -|");
+                        for (int i = 0; i < searchResults.Length; i++)
+                        {
+                            Console.WriteLine(String.Format(
+                                "|{0, 6}|{1, 16}|{2, 16}|{3,9}|",
+                                i + 1,
+                                searchResults[i]["name"],
+                                searchResults[i]["size"],
+                                searchResults[i]["numOfPeers"]));
+                        }
+                        Console.WriteLine("n: next page, p: previous page, <id>: download file <id>, q: quit");
+                    }
+                    Console.Write("S> ");
+                    command = Console.ReadLine();
+                    if (command.Equals("n"))
+                    {
+                        if (searchResults.Length < limit)
+                        {
+                            Console.WriteLine("This is the last page");
+                            printTable = false;
+                            continue;
+                        }
+                        page++;
+                        offset = limit * (page - 1);
+                        Dictionary<string, dynamic>[] newSearchResults = trackerClient.Query(input[1], limit, offset);
+                        if (searchResults.Length == 0)
+                        {
+                            Console.WriteLine("This is the last page");
+                            printTable = false;
+                            continue;
+                        }
+                        else
+                        {
+                            searchResults = newSearchResults;
+                            printTable = true;
+                            continue;
+                        }
+                    }
+                    if (command.Equals("p"))
+                    {
+                        if (page == 1)
+                        {
+                            Console.WriteLine("This is the first page");
+                            printTable = false;
+                            continue;
+                        }
+                        page--;
+                        offset = limit * (page - 1);
+                        searchResults = trackerClient.Query(input[1], limit, offset);
+                        printTable = true;
+                        continue;
+                    }
+                    if (command.Equals("q"))
+                    {
+                        break;
+                    }
+                    try
+                    {
+                        uint id = UInt32.Parse(command);
+                        if (id < offset + 1 || id > offset + limit + 1)
+                        {
+                            Console.WriteLine("Invalid ID");
+                            printTable = false;
+                            continue;
+                        }
+                        ExecuteDownload(id + 1);
+                        printTable = false;
+                        continue;
+                    }
+                    catch (Exception) { }
+                }
+                else
+                {
+                    Console.WriteLine("No results where found for " + input[1]);
+                    break;
+                }
+            } while (true);
         }
+
         #endregion
 
         #region /* Execute Methods */
@@ -235,7 +314,6 @@ namespace Hermes
             Console.WriteLine("Started to crawl BaseFolder");
         }
 
-        // TODO: ExecuteSearch
         private static void ExecuteSearch()
         {
             if (input.Length == 1)
@@ -244,8 +322,7 @@ namespace Hermes
             }
             else
             {
-                Console.WriteLine("Results for " + input[1] + ":");
-                Console.WriteLine("...");
+                RunSearchCommandLine();
             }
         }
 
@@ -315,11 +392,12 @@ namespace Hermes
         }
 
         // TODO: ExecuteExecutewnload
-        private static void ExecuteDownload()
+        private static void ExecuteDownload(uint id)
         {
             if (input.Length == 2)
             {
-                Console.WriteLine("Started download of " + input[1]);
+                string fileID = searchResults[id]["fileID"];
+                Console.WriteLine("Started download of " + id);
             }
             else
             {

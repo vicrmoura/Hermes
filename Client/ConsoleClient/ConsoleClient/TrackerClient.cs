@@ -127,7 +127,7 @@ namespace Hermes
 
         // Return the results of a query in the format:
         // [{'name': 'xxx', 'size': 100, 'fileID': 'yyy', 'numOfPeers': 10}, {...}, ...]
-        public ArrayList Query(string fileName, uint limit, uint offset)
+        public Dictionary<string, dynamic>[] Query(string fileName, uint limit = 50, uint offset = 0)
         {
             var dict = new Dictionary<string, dynamic> {
                  {"type", "query"},
@@ -142,8 +142,16 @@ namespace Hermes
                 throw new IOException();
             }
             Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
-            Logger.log(TAG, "Search of " + fileName + " successfully concluded, " + jsonResponse["results"].Count + " results received.");
-            return jsonResponse["results"]; 
+            ArrayList queryResponse = jsonResponse["results"];
+
+            Logger.log(TAG, "Search of " + fileName + " successfully concluded, " + queryResponse.Count + " results received.");
+            
+            Dictionary<string, dynamic>[] searchResults = new Dictionary<string, dynamic>[queryResponse.Count];
+            for (int i = 0; i < queryResponse.Count; i++)
+            {
+                searchResults[i] = (Dictionary<string, dynamic>)queryResponse[i];
+            }
+            return searchResults;
         }
 
 
@@ -172,7 +180,7 @@ namespace Hermes
             {
                 dict.Add("maxPeers", maxPeers);    
             }
-            Logger.log(TAG, "Sending Heartbeat of " + fileStats.Count + " file(s)");
+            Logger.log(TAG, "Sending Heartbeat of " + fileStats.Count + " file" + (fileStats.Count > 1 ? "s" : ""));
             string response = SendMessage(jsonSerializer.Serialize(dict));
             if (response == null)
             {
