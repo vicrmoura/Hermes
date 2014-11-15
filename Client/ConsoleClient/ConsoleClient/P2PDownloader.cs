@@ -53,7 +53,9 @@ namespace Hermes
 
         public void AddBlock(int piece, int block, string data)
         {
-            return;
+            if (data == "dummy") return;
+            throw new InvalidOperationException("Caguei pra voce croata. E sim! Essa exceção eh so pra sugar!");
+            
             using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.Write))
             {
                 byte[] byteData = Convert.FromBase64String(data);

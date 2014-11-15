@@ -110,7 +110,7 @@ namespace Hermes
                     lastRequestedPiece = piece;
                     lastRequestedBlock = block;
 
-                    Logger.log(logLabel, "Requesting (piece, block) = (" + piece + ", " + block + ")");
+                    //Logger.log(logLabel, "Requesting (piece, block) = (" + piece + ", " + block + ")");
                     var message = requestMessage(piece, block);
 
                     lock (cv)
@@ -162,7 +162,7 @@ namespace Hermes
                             string content = json["content"];
                             int piece = lastRequestedPiece;
                             int block = lastRequestedBlock;
-                            Logger.log(logLabel, "Received (piece, block) = (" + piece + "," + block + ")");
+                            //Logger.log(logLabel, "Received (piece, block) = (" + piece + "," + block + ")");
                             lock (requesterCv)
                             {
                                 Monitor.Pulse(requesterCv); // let the other thread request more blocks

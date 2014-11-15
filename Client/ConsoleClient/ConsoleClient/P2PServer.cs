@@ -12,8 +12,11 @@ namespace Hermes
 {
     class P2PServer
     {
+        private Dictionary<string, int> qtd = new Dictionary<string,int>(); // for debuging purposes
+
+
         private static readonly string SERVER_LOG = "SERVER";
-        private static readonly int MAX_UNCHOKED = 10;
+        private static readonly int MAX_UNCHOKED = 5;
 
         public static readonly int SERVER_PORT = 3000;
 
@@ -80,7 +83,6 @@ namespace Hermes
                         if (!myChokeState)
                         {
                             string data = sr.ReadLine();
-                            Logger.log(SERVER_LOG, peerId + " sent " + data);
                             if (data == null)  // disconnected
                             {
                                 connected = false;
@@ -97,12 +99,13 @@ namespace Hermes
                             {
                                 case "connect":
                                     peerId = json["peerId"];
-                                    /*lock (chokeUnchokeLock)
+                                    lock (chokeUnchokeLock)
                                     {
                                         connectedPeers.Add(peerId);
                                     }
+                                    qtd[peerId] = 0;
                                     myChokeState = false;
-                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!*/
+                                    maybeChokeRandomPeer(); // maybe i will get choked here... who knows!
                                     Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                     connected = true;
                                     lock (uploaders)
@@ -126,7 +129,9 @@ namespace Hermes
                                 case "request":
                                     int piece = json["piece"];
                                     int block = json["block"];
-                                    Logger.log(SERVER_LOG, "Client " + peerId + " requested (piece, block) = (" + piece + "," + block + ")");
+                                    //Logger.log(SERVER_LOG, "Client " + peerId + " requested (piece, block) = (" + piece + "," + block + ") [" + (qtd++) + " block requested]");
+                                    //Logger.log(SERVER_LOG, "Client " + peerId + " [" + (qtd++) + " block requested]");
+                                    qtd[peerId]++;
                                     P2PUploader uploader;
                                     lock (uploaders)
                                     {
@@ -150,11 +155,11 @@ namespace Hermes
                         }
                         else
                         {
-                            System.Threading.Thread.Sleep(30000);
+                            System.Threading.Thread.Sleep(5000);
                         }
 
                         // if choke state changed, send message
-                        /*bool shouldBeChoked;
+                        bool shouldBeChoked;
                         lock(chokeUnchokeLock)
                         {
                             shouldBeChoked = chokedSet.Contains(peerId);
@@ -167,8 +172,9 @@ namespace Hermes
                         if (!myChokeState && shouldBeChoked)
                         {
                             myChokeState = true;
+                            Logger.log(SERVER_LOG, "Choking " + peerId + " [" + qtd[peerId] + " request messages]");
                             send(sw, chokeMessage());
-                        }*/
+                        } 
 
                     }
                     catch (Exception e)
@@ -179,7 +185,7 @@ namespace Hermes
                 } while (connected);
 
                 // unchoke someone if I was unchoked because i am leaving
-                /*lock (chokeUnchokeLock)
+                lock (chokeUnchokeLock)
                 {
                     connectedPeers.Remove(peerId);
                     if (chokedSet.Contains(peerId))
@@ -190,7 +196,7 @@ namespace Hermes
                     {
                         unchokeRandomPeer();
                     }
-                }*/
+                }
 
                 sw.Flush();
                 System.Threading.Thread.Sleep(1000); // wait for last messages to be sent and read
@@ -238,7 +244,6 @@ namespace Hermes
 
         void maybeChokeRandomPeer()
         {
-            return;
             lock (chokeUnchokeLock)
             {
                 if (connectedPeers.Count - chokedSet.Count > MAX_UNCHOKED)
@@ -251,7 +256,6 @@ namespace Hermes
         // not thread safe
         void chokeRandomPeer()
         {
-            return;
             while (true)
             {
                 int toChoke = random.Next() % connectedPeers.Count;
@@ -267,7 +271,6 @@ namespace Hermes
         // not thread safe
         void unchokeRandomPeer()
         {
-            return;
             if (chokedSet.Count == 0) return;
             while (true)
             {
