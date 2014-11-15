@@ -182,12 +182,11 @@ namespace Hermes
                 while (true)
                 {
                     Thread.Sleep(trackerClient.HeartbeatInterval);
-                    Dictionary<string, HFile> currentFiles = fileManager.getFiles();
-                    if (currentFiles.Count > 0)
+                    if (files.Count > 0)
                     {
                         try
                         {
-                            trackerClient.Heartbeat(currentFiles, PeerId, LocalIP, LocalPort);
+                            trackerClient.Heartbeat(files, PeerId, LocalIP, LocalPort);
                         }
                         catch (Exception) { }
                     }
@@ -252,7 +251,7 @@ namespace Hermes
             string a = Convert.ToBase64String(new byte[] {3, 56, 255, 30});
             string b = Convert.ToBase64String(new byte[] {1, 2, 3, 4});
             string[] sha1s = new string[]{ a, b };
-            testFile.ID = trackerClient.UploadMetaInfo(fileManager.getFiles()["1234"], PeerId, LocalIP, LocalPort);
+            testFile.ID = trackerClient.UploadMetaInfo(testFile, PeerId, LocalIP, LocalPort);
             trackerClient.UploadMetaInfo(testFile, "Dhalsim", "ip", "port");
             trackerClient.Query("capt am", 10, 0);
         }
