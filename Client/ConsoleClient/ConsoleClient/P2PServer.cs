@@ -99,12 +99,13 @@ namespace Hermes
                             {
                                 case "connect":
                                     string fileId = json["fileId"];
-                                    peerId = json["peerId"] + "#" + fileId; // # is a forbidden character for fileId and peerId
+                                    string id = json["peerId"];
+                                    peerId = id + "#" + fileId; // # is a forbidden character for fileId and peerId
                                     Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                     connected = true;
                                     lock (uploaders)
                                     {
-                                        if (peerId == myId || uploaders.ContainsKey(peerId))
+                                        if (id == myId || uploaders.ContainsKey(peerId))
                                         {
                                             Logger.log(SERVER_LOG, "Connection with peer " + peerId + " rejected");
                                             connected = false;
@@ -114,11 +115,15 @@ namespace Hermes
                                             Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
                                             uploaders[peerId] = new P2PUploader(fileManager, fileId);
                                         }
+                                        if (!uploaders[peerId].fileExists())
+                                        {
+                                            Logger.log(SERVER_LOG, "Requesting unexistent file: " + fileId);
+                                            connected = false;
+                                        }
 
                                         Logger.log(SERVER_LOG, "Answering handshake");
                                         send(sw, connectMessage(uploaders[peerId].getBitField()));
                                     }
-                                    if (!connected) break;
 
                                     lock (chokeUnchokeLock)
                                     {
@@ -127,7 +132,6 @@ namespace Hermes
                                     qtd[peerId] = 0;
                                     myChokeState = false;
                                     maybeChokeRandomPeer(); // maybe i will get choked here... who knows!
-
                                     break;
                                 case "request":
                                     int piece = json["piece"];

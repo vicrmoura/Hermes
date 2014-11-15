@@ -19,6 +19,11 @@ namespace Hermes
             this.file = fileManager.getFile(fileId);
         }
 
+        public bool fileExists()
+        {
+            return this.file != null;
+        }
+
         public string getBitField()
         {
             return file.BitField;
