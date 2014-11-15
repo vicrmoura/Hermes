@@ -131,36 +131,12 @@ namespace Hermes
                 files = new Dictionary<string, HFile>();
             }
             Console.WriteLine("[OK]");
-            
-            // Dummy
-            files["file"] = new HFile();
-            files["file"].Name = "file.txt";
-            files["file"].ID = "file";
-            files["file"].Size = 2560;
-            files["file"].BlockSize = 1024;
-            files["file"].PieceSize = 10240;
-            files["file"].Status = StatusType.Started;
-            files["file"].Percentage = 0;
-            files["file"].BitField = "0";
-            files["file"].Pieces = new[] {
-                new Func<Piece>(() => { var result = new Piece("sha"); result.BitField = "000"; result.Size = 2560; return result; })()
-            };
 
             // Start p2p-server
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId, files);
-            var downloader = new P2PDownloader("file", files["file"]);
 
-            // Dummy
-            //Task.Run(() => downloader.AddBlock(0, 0, Convert.ToBase64String(Enumerable.Repeat((byte)48, 1024).ToArray())));
-            //Task.Run(() => downloader.AddBlock(0, 1, Convert.ToBase64String(Enumerable.Repeat((byte)49, 1024).ToArray())));
-            //Task.Run(() => downloader.AddBlock(0, 2, Convert.ToBase64String(Enumerable.Repeat((byte)50, 512).ToArray())));
-
-            for (int i = 0; i < 20; i++)
-            {
-                P2PClient p2pClient = new P2PClient("Harry" + i, downloader, "127.0.0.1", P2PServer.SERVER_PORT);
-            }
             Console.WriteLine("[OK]");
 
             // Start crawling BaseFolder
@@ -222,13 +198,13 @@ namespace Hermes
                         {
                             int bytesRead = fs.Read(buffer, 0, file.PieceSize);
                             byte[] sha = shaConverter.ComputeHash(buffer, 0, bytesRead);
-                            file.Pieces[i] = new Piece(Convert.ToBase64String(sha));
+                            file.Pieces[i] = new Piece() { Sha = Convert.ToBase64String(sha) };
                             if (bytesRead != file.PieceSize)
                             {
                                 file.Pieces[i].Size = bytesRead;
                             }
                         }
-                        string fileID = "dummy"; // client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                        string fileID = client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
                         file.ID = fileID;
                         files[fileID] = file;   
                     }
@@ -402,8 +378,18 @@ namespace Hermes
         // TODO: ExecuteQuit
         private static void ExecuteQuit()
         {
-            Console.WriteLine("Closing connections...");
             quit = true;
+
+            Console.Write("Closing connections...  ");
+            Console.WriteLine("[OK]");
+
+            Console.Write("Saving database...      ");
+            using (var sr = new StreamWriter("database.xml"))
+            {
+                XmlSerializer serializer = new XmlSerializer(typeof(HFile[]), new XmlRootAttribute() { ElementName = "files" });
+                serializer.Serialize(sr, files.Values.ToArray());
+            }
+            Console.WriteLine("[OK]");
         }
 
         private static bool TryParseIPPort(string input, ref string IP, ref string port)

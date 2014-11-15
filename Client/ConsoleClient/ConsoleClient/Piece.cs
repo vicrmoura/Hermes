@@ -5,11 +5,6 @@ namespace Hermes
     [XmlType(TypeName = "piece")]
     public class Piece
     {
-        public Piece(string sha)
-        {
-            Sha = sha;
-        }
-
         [XmlAttribute(AttributeName = "sha")]
         public string Sha;
 

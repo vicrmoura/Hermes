@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<files xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <file name="dummyfile.txt" size="3072" fileID="/v4qZ9bpq5HzllmfabzJ9/o515o=" pieceSize="102400" blockSize="1024" status="Completed">
+    <piece sha="68dYRVzApEJZZ6KxyYoBYKMe37k=" size="3072" />
+  </file>
+</files>
