@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.IO;
 using System.Web.Script.Serialization;
+using System.Collections;
 
 namespace Hermes
 {
@@ -23,7 +24,6 @@ namespace Hermes
             get { return trackerIP; }
             set { trackerIP = value; newIPSpecified = true; }
         }
-        private int heartbeatInterval = 1000;
         public int HeartbeatInterval
         {
             get;
@@ -36,7 +36,6 @@ namespace Hermes
         private JavaScriptSerializer jsonSerializer;
         private bool newIPSpecified = false;
         private bool newPortSpecified = false;
-        private int heartbeatInterval = 1000;
 
         public TrackerClient(string ip, string port)
         {
@@ -45,7 +44,7 @@ namespace Hermes
             jsonSerializer = new JavaScriptSerializer();
         }
         
-        private string sendMessage(string data)
+        private string SendMessage(string data)
         {
             try
             {
@@ -75,7 +74,14 @@ namespace Hermes
                     Logger.log(TAG, "Ready to send data");
                     sw.WriteLine(data);
                     Logger.log(TAG, "Data sent, waiting response");
-                    return sr.ReadLine();
+                    string response = sr.ReadLine();
+                    if (response == null)
+                    {
+                        Logger.log(TAG, "[Error] Connection closed by Tracker");
+                        throw new IOException();
+                    }
+                    Logger.log(TAG, "Response arrived");
+                    return response;
                 }
                 catch (Exception e)
                 {
@@ -90,10 +96,10 @@ namespace Hermes
             {
                 Logger.log(TAG, "[Error] Cannot connect to tracker server. Message: " + e.Message);
             }
-            return "";
+            return null;
         }
 
-        public string uploadMetaInfo(HFile file, byte[][] sha1s, string peerID, string peerIP, string peerPort)
+        public string UploadMetaInfo(HFile file, byte[][] sha1s, string peerID, string peerIP, string peerPort)
         {
             var dict = new Dictionary<string, dynamic> {
                  {"type", "upload"},
@@ -107,14 +113,36 @@ namespace Hermes
                  {"ip", peerIP}
             };
             Logger.log(TAG, "Starting upload of " + file.Name);
-            string response = sendMessage(jsonSerializer.Serialize(dict));
-            if (response.Length == 0)
+            string response = SendMessage(jsonSerializer.Serialize(dict));
+            if (response == null)
             {
                 throw new IOException();
             }
             Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
             HeartbeatInterval = jsonResponse["interval"];
+            Logger.log(TAG, "Upload of " + file.Name + " successfully concluded.");
             return jsonResponse["fileID"];
+        }
+
+        // Return the results of a query in the format:
+        // [{'name': 'xxx', 'size': 100, 'fileID': 'yyy', 'numOfPeers': 10}, {...}, ...]
+        public ArrayList Query(string fileName, uint limit, uint offset)
+        {
+            var dict = new Dictionary<string, dynamic> {
+                 {"type", "query"},
+                 {"name", fileName},
+                 {"limit", limit}, 
+                 {"offset", offset}
+            };
+            Logger.log(TAG, "Starting search of " + fileName);
+            string response = SendMessage(jsonSerializer.Serialize(dict));
+            if (response == null)
+            {
+                throw new IOException();
+            }
+            Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
+            Logger.log(TAG, "Search of " + fileName + " successfully concluded.");
+            return jsonResponse["results"]; 
         }
     }
 }
