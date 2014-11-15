@@ -169,7 +169,7 @@ namespace Hermes
                     file.Status = StatusType.Completed;
                     file.PercentageSpecified = false;
                     file.Size = new FileInfo(filePath).Length;
-                    file.PieceSize = (int)Math.Max(2*kB, file.Size/(10*kB));
+                    file.PieceSize = (int)Math.Max(100*kB, file.Size/(10*kB));
                     file.BlockSize = Math.Max(1*kB, file.PieceSize / 100);
 
                     FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
