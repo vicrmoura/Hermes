@@ -169,26 +169,28 @@ namespace Hermes
                     file.Status = StatusType.Completed;
                     file.PercentageSpecified = false;
                     file.Size = new FileInfo(filePath).Length;
-                    file.PieceSize = (int)Math.Max(100*kB, file.Size/(10*kB));
+                    file.PieceSize = (int)Math.Max(100*kB, file.Size/(10*kB)/100*100);
                     file.BlockSize = Math.Max(1*kB, file.PieceSize / 100);
 
-                    FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-                    byte[] buffer = new byte[file.PieceSize];
-                    int N = (int)Math.Ceiling(1.0 * file.Size/file.PieceSize);
-                    file.Pieces = new Piece[N];
-                    for (int i = 0; i < N; i++)
+                    using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                     {
-                        int bytesRead = fs.Read(buffer, 0, file.PieceSize);
-                        byte[] sha = shaConverter.ComputeHash(buffer, 0, bytesRead);
-                        file.Pieces[i] = new Piece(Convert.ToBase64String(sha));
-                        if (bytesRead != file.PieceSize)
+                        byte[] buffer = new byte[file.PieceSize];
+                        int N = (int)Math.Ceiling(1.0 * file.Size / file.PieceSize);
+                        file.Pieces = new Piece[N];
+                        for (int i = 0; i < N; i++)
                         {
-                            file.Pieces[i].Size = bytesRead;
+                            int bytesRead = fs.Read(buffer, 0, file.PieceSize);
+                            byte[] sha = shaConverter.ComputeHash(buffer, 0, bytesRead);
+                            file.Pieces[i] = new Piece(Convert.ToBase64String(sha));
+                            if (bytesRead != file.PieceSize)
+                            {
+                                file.Pieces[i].Size = bytesRead;
+                            }
                         }
+                        string fileID = client.UploadMetaInfo(file, null, PeerId, LocalIP, LocalPort);
+                        file.ID = fileID;
+                        files[fileID] = file;   
                     }
-                    string fileID = client.UploadMetaInfo(file, null, PeerId, LocalIP, LocalPort);
-                    file.ID = fileID;
-                    files[fileID] = file;
                 }
             }
         }
