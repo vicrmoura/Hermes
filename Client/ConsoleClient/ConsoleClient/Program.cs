@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
@@ -8,7 +9,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
-
 using TSSA = System.Tuple<string, string, System.Action>;
 
 namespace Hermes
@@ -40,6 +40,8 @@ namespace Hermes
         private static string[] input;
         private static bool quit = false;
         private static Dictionary<string, HFile> files;
+        private static TrackerClient trackerClient;
+        private static FileManager fileManager;
         
         private static string TrackerIP;
         private static string TrackerPort;
@@ -47,6 +49,7 @@ namespace Hermes
         private static string LocalPort;
         public static string BaseFolder;
         private static string PeerId;
+
         #endregion
 
         #region /* Main */
@@ -105,6 +108,10 @@ namespace Hermes
 
             Console.WriteLine("[OK]");
 
+            // Initializing TrackerClient
+
+            trackerClient = new TrackerClient(TrackerIP, TrackerPort);
+
             // Load database
 
             Console.Write(string.Format(" * {0,-30}", "Load database"));
@@ -124,7 +131,7 @@ namespace Hermes
             
             // Initializing file manager (faz isso a onde vc quiser croata)
 
-            FileManager fileManager = new FileManager();
+            fileManager = new FileManager();
 
             // Dummy
             files["file"] = new HFile();
@@ -164,9 +171,17 @@ namespace Hermes
             Console.WriteLine("[OK]");
 
             // Start heartbeat
-
+            
             Console.Write(string.Format(" * {0,-30}", "Start heartbeat"));
-            // TODO: Start heartbeat
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    Thread.Sleep(trackerClient.HeartbeatInterval);
+                    Dictionary<string, HFile> currentFiles = fileManager.getFiles();
+                    if (currentFiles.Count > 0) trackerClient.Heartbeat(currentFiles, PeerId, LocalIP, LocalPort);
+                }
+            });          
             Console.WriteLine("[OK]");
         }
 
@@ -208,12 +223,27 @@ namespace Hermes
                                 file.Pieces[i].Size = bytesRead;
                             }
                         }
-                        string fileID = client.UploadMetaInfo(file, null, PeerId, LocalIP, LocalPort);
+                        string fileID = client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
                         file.ID = fileID;
                         files[fileID] = file;   
                     }
                 }
             }
+        }
+        
+        private static void TrackerTest()
+        {
+            HFile testFile = new HFile();
+            testFile.Name = "Captain America";
+            testFile.PieceSize = 10000;
+            testFile.BlockSize = 10;
+            testFile.Size = 123456789;
+            string a = Convert.ToBase64String(new byte[] {3, 56, 255, 30});
+            string b = Convert.ToBase64String(new byte[] {1, 2, 3, 4});
+            string[] sha1s = new string[]{ a, b };
+            testFile.ID = trackerClient.UploadMetaInfo(fileManager.getFiles()["1234"], PeerId, LocalIP, LocalPort);
+            trackerClient.UploadMetaInfo(testFile, "Dhalsim", "ip", "port");
+            trackerClient.Query("capt am", 10, 0);
         }
         #endregion
 

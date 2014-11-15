@@ -36,70 +36,71 @@ namespace Hermes
         private JavaScriptSerializer jsonSerializer;
         private bool newIPSpecified = false;
         private bool newPortSpecified = false;
+        private readonly object socketLock = new object();
 
         public TrackerClient(string ip, string port)
         {
             TrackerIP = ip;
             TrackerPort = port;
+            HeartbeatInterval = 1000;
             jsonSerializer = new JavaScriptSerializer();
         }
         
         private string SendMessage(string data)
         {
-            try
+            lock (socketLock)
             {
-                if (tcpClient == null || !tcpClient.Connected || newIPSpecified || newPortSpecified) 
+                try
                 {
-                    newIPSpecified = newPortSpecified = false;
-                    int port = -1;
+                    if (tcpClient == null || !tcpClient.Connected || newIPSpecified || newPortSpecified)
+                    {
+                        newIPSpecified = newPortSpecified = false;
+                        int port = -1;
+                        try
+                        {
+                            port = Int32.Parse(TrackerPort);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.log(TAG, "[Error] Invalid port for tracker server. Message: " + e.Message);
+                        }
+
+                        tcpClient = new TcpClient(TrackerIP, port);
+                        Logger.log(TAG, "Connected");
+                    }
+                    Stream s = null;
                     try
                     {
-                        port = Int32.Parse(TrackerPort);
+                        s = tcpClient.GetStream();
+                        var sw = new StreamWriter(s);
+                        var sr = new StreamReader(s);
+                        sw.AutoFlush = true;
+                        Logger.log(TAG, "Ready to send data");
+                        sw.WriteLine(data);
+                        Logger.log(TAG, "Data sent, waiting response");
+                        string response = sr.ReadLine();
+                        if (response == null)
+                        {
+                            Logger.log(TAG, "[Error] Connection closed by Tracker");
+                            throw new IOException();
+                        }
+                        Logger.log(TAG, "Response arrived");
+                        return response;
                     }
                     catch (Exception e)
                     {
-                        Logger.log(TAG, "[Error] Invalid port for tracker server. Message: " + e.Message);
+                        Logger.log(TAG, "[Error] There was a problem during tracker server communication. Message: " + e.Message);
                     }
-
-                    tcpClient = new TcpClient(TrackerIP, port);
-                    Logger.log(TAG, "Connected");
-                }
-                Stream s = null;
-                try
-                {
-                    s = tcpClient.GetStream();
-                    var sw = new StreamWriter(s);
-                    var sr = new StreamReader(s);
-                    sw.AutoFlush = true;
-                    Logger.log(TAG, "Ready to send data");
-                    sw.WriteLine(data);
-                    Logger.log(TAG, "Data sent, waiting response");
-                    string response = sr.ReadLine();
-                    if (response == null)
-                    {
-                        Logger.log(TAG, "[Error] Connection closed by Tracker");
-                        throw new IOException();
-                    }
-                    Logger.log(TAG, "Response arrived");
-                    return response;
                 }
                 catch (Exception e)
                 {
-                    Logger.log(TAG, "[Error] There was a problem during tracker server communication. Message: " + e.Message);
+                    Logger.log(TAG, "[Error] Cannot connect to tracker server. Message: " + e.Message);
                 }
-                finally
-                {
-                    if (s != null) s.Close();
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.log(TAG, "[Error] Cannot connect to tracker server. Message: " + e.Message);
             }
             return null;
         }
 
-        public string UploadMetaInfo(HFile file, string[] sha1s, string peerID, string peerIP, string peerPort)
+        public string UploadMetaInfo(HFile file, string peerID, string peerIP, string peerPort)
         {
             var dict = new Dictionary<string, dynamic> {
                  {"type", "upload"},
@@ -107,7 +108,7 @@ namespace Hermes
                  {"size", file.Size}, 
                  {"pieceSize", file.PieceSize},
                  {"blockSize", file.BlockSize},
-                 {"piecesSHA1S", sha1s},
+                 {"piecesSHA1S", file.Pieces.Select((p) => p.Sha)},
                  {"peerID", peerID},
                  {"port", peerPort},
                  {"ip", peerIP}
@@ -146,8 +147,20 @@ namespace Hermes
         }
 
 
-        public Dictionary<string, dynamic> Heartbeat(Dictionary<string, string> fileStats, string peerID, string peerIP, string peerPort, int maxPeers = 0)
+        public Dictionary<string, dynamic> Heartbeat(Dictionary<string, HFile> files, string peerID, string peerIP, string peerPort, int maxPeers = 0)
         {
+            Dictionary<string, string> fileStats = new Dictionary<string, string>();
+            foreach (var fileID in files.Keys) 
+            {
+                string status;
+                StatusType sType = files[fileID].Status;
+                if ( sType == StatusType.Canceled || sType == StatusType.Paused) {
+                    status = "inactive";
+                } else {
+                    status = "active";
+                }
+                fileStats.Add(fileID, status);
+            }
             var dict = new Dictionary<string, dynamic> {
                  {"type", "heartbeat"},
                  {"files", fileStats},
