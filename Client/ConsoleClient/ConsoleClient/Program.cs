@@ -45,7 +45,7 @@ namespace Hermes
         private static string TrackerPort;
         private static string LocalIP;
         private static string LocalPort;
-        private static string BaseFolder;
+        public static string BaseFolder;
         private static string PeerId;
         #endregion
 
@@ -126,11 +126,31 @@ namespace Hermes
 
             FileManager fileManager = new FileManager();
 
+            // Dummy
+            files["file"] = new HFile();
+            files["file"].Name = "file.txt";
+            files["file"].ID = "file";
+            files["file"].Size = 2560;
+            files["file"].BlockSize = 1024;
+            files["file"].PieceSize = 10240;
+            files["file"].Status = StatusType.Started;
+            files["file"].Percentage = 0;
+            files["file"].BitField = "0";
+            files["file"].Pieces = new[] {
+                new Func<Piece>(() => { var result = new Piece("sha"); result.BitField = "000"; result.Size = 2560; return result; })()
+            };
+
             // Start p2p-server
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId, fileManager);
-            var downloader = new P2PDownloader(fileManager, "file");
+            var downloader = new P2PDownloader("file", files["file"]);
+
+            // Dummy
+            //Task.Run(() => downloader.AddBlock(0, 0, Convert.ToBase64String(Enumerable.Repeat((byte)48, 1024).ToArray())));
+            //Task.Run(() => downloader.AddBlock(0, 1, Convert.ToBase64String(Enumerable.Repeat((byte)49, 1024).ToArray())));
+            //Task.Run(() => downloader.AddBlock(0, 2, Convert.ToBase64String(Enumerable.Repeat((byte)50, 512).ToArray())));
+
             for (int i = 0; i < 20; i++)
             {
                 P2PClient p2pClient = new P2PClient("Harry" + i, downloader, "127.0.0.1", P2PServer.SERVER_PORT, fileManager);
@@ -162,7 +182,8 @@ namespace Hermes
             foreach (string filePath in Directory.EnumerateFiles(BaseFolder))
             {
                 string fileName = Path.GetFileName(filePath);
-                if (!fileNames.Contains(fileName)) // fileName is not yet synchronized by this program => create metainfo then update it to tracker
+                // fileName is not yet synchronized by this program => create metainfo then update it to tracker
+                if (!fileNames.Contains(fileName) && fileName.Split('.').Last() != "downloading")
                 {
                     HFile file = new HFile();
                     file.Name = fileName;

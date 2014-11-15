@@ -32,7 +32,7 @@ namespace Hermes
             this.downloader = downloader;
             this.isDownloading = false;
             this.choked = false;
-            this.logLabel = myId + ":" + downloader.FileId;
+            this.logLabel = myId + ":" + downloader.FileID;
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
         }
@@ -59,7 +59,7 @@ namespace Hermes
 
                 // Starting handshake
                 Logger.log(logLabel, "Starting handshake");
-                send(sw, connectMessage(downloader.FileId));
+                send(sw, connectMessage(downloader.FileID));
 
                 // Receiving handshake answer
                 string handshake = sr.ReadLine();
@@ -75,7 +75,7 @@ namespace Hermes
                     Logger.log(logLabel, "Server didn't answer the handshake properly. Answer: " + handshake);
                 }
 
-                downloader.setBitField(json["bitField"]);
+                downloader.SetBitField(json["bitField"]);
 
                 Logger.log(logLabel, "Handshake complete");
 
@@ -97,7 +97,7 @@ namespace Hermes
                         }
                     }
 
-                    var tup = downloader.getNextBlock();
+                    var tup = downloader.GetNextBlock();
                     if (tup == null)
                     {
                         Logger.log(logLabel, "Finished downloading");
@@ -158,7 +158,6 @@ namespace Hermes
                     var json = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(data);
                     switch ((string)json["type"])
                     {
-                        
                         case "data":
                             string content = json["content"];
                             int piece = lastRequestedPiece;
@@ -168,7 +167,7 @@ namespace Hermes
                             {
                                 Monitor.Pulse(requesterCv); // let the other thread request more blocks
                             }
-                            downloader.addBlock(piece, block, content);
+                            downloader.AddBlock(piece, block, content);
                             break;
                         case "have":
                             break;
