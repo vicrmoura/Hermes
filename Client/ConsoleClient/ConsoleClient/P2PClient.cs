@@ -22,6 +22,7 @@ namespace Hermes
         private P2PDownloader downloader;
         private bool isDownloading;
         private string logLabel;
+        bool choked;
 
         public P2PClient(string myId, P2PDownloader downloader, string ip, int port, FileManager fileManager)
         {
@@ -30,6 +31,7 @@ namespace Hermes
             this.fileManager = fileManager;
             this.downloader = downloader;
             this.isDownloading = false;
+            this.choked = false;
             this.logLabel = myId + ":" + downloader.FileId;
             clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
@@ -78,12 +80,23 @@ namespace Hermes
                 Logger.log(logLabel, "Handshake complete");
 
                 object cv = new object();
+                object unchokeCv = new object();
                 
                 isDownloading = true;
-                Task t = Task.Run(() => clientListener(sr, sw, cv));
+                Task t = Task.Run(() => clientListener(sr, sw, cv, unchokeCv));
                 
                 while (isDownloading)
                 {
+                    lock (unchokeCv)
+                    {
+                        if (choked)
+                        {
+                            Logger.log(myId, "Can't send new request because I'm choked. Starting long sleep");
+                            Monitor.Wait(unchokeCv);
+                            Logger.log(myId, "Waking up. Good morning!");
+                        }
+                    }
+
                     var tup = downloader.getNextBlock();
                     if (tup == null)
                     {
@@ -129,7 +142,7 @@ namespace Hermes
 
         }
 
-        void clientListener(StreamReader sr, StreamWriter sw, object requesterCv)
+        void clientListener(StreamReader sr, StreamWriter sw, object requesterCv, object unchokeCv)
         {
             while (isDownloading)
             {
@@ -160,8 +173,17 @@ namespace Hermes
                         case "have":
                             break;
                         case "choke":
+                            Logger.log(myId, "Being choked");
+                            choked = true;
                             break;
                         case "unchoke":
+                            Logger.log(myId, "Being unchoked");
+                            lock(unchokeCv)
+                            {
+                                choked = false;
+                                Monitor.Pulse(unchokeCv);
+                            }
+                            
                             break;
                         case "close":
                             isDownloading = false;
