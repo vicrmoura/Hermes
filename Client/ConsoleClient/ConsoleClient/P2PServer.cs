@@ -143,8 +143,8 @@ namespace Hermes
                                     string blockData = uploader.getBlock(piece, block);
                                     send(sw, dataMessage(blockData));
                                     break;
-                                case "cancel":
-                                    break;
+                                //case "cancel": // for now caga
+                                  //  break;
                                 case "close":
                                     connected = false;
                                     Logger.log(SERVER_LOG, "Connection closed by the client");
