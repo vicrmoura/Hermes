@@ -18,7 +18,7 @@ namespace Hermes
         private static readonly string SERVER_LOG = "SERVER";
         private static readonly int MAX_UNCHOKED = 5;
 
-        public static readonly int SERVER_PORT = 3000;
+       // public static int SERVER_PORT;
 
         private TcpListener tcpListener;
         private Task listenTask;
@@ -33,12 +33,12 @@ namespace Hermes
         private object chokeUnchokeLock = new object();
         Random random = new Random();
 
-        public P2PServer(string myId, Dictionary<string, HFile> files)
+        public P2PServer(string myId, Dictionary<string, HFile> files, int port)
         {
             Logger.log(SERVER_LOG, "Initializing P2P server...");
             this.myId = myId;
             this.files = files;
-            this.tcpListener = new TcpListener(IPAddress.Any, SERVER_PORT);
+            this.tcpListener = new TcpListener(IPAddress.Any, port);
             this.chokedSet = new HashSet<string>();
             this.connectedPeers = new List<string>();
             uploaders = new Dictionary<string, P2PUploader>();

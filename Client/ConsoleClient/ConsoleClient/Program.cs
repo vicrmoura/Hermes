@@ -140,7 +140,7 @@ namespace Hermes
             // Start p2p-server
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
-            P2PServer p2pServer = new P2PServer(PeerId, files);
+            P2PServer p2pServer = new P2PServer(PeerId, files, int.Parse(LocalPort));
 
             // Start download manager
 
