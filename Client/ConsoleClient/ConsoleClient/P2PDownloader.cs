@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections;
 using System.IO;
@@ -22,6 +23,7 @@ namespace Hermes
         private readonly string filePath;
         private readonly P2PServer server;
         private readonly Dictionary<string/*peerId*/, BitArray> bitFields;
+        private readonly HashSet<Tuple<int, int>> requestedBlocks;
 
         /* Constructor */
 
@@ -32,6 +34,7 @@ namespace Hermes
             this.server = server;
             this.filePath = Path.Combine(Program.BaseFolder, hfile.Name + DOWNLOADING);
             this.bitFields = new Dictionary<string, BitArray>();
+            this.requestedBlocks = new HashSet<Tuple<int, int>>();
 
             lock (hfile)
             {
@@ -54,7 +57,10 @@ namespace Hermes
             {
                 ba[i] = (bitField[i] == '1');
             }
-            bitFields[peerName] = ba;
+            lock (bitFields)
+            {
+				bitFields[peerName] = ba;
+            }
         }
 
         /// <summary>
@@ -63,8 +69,65 @@ namespace Hermes
         /// <returns>The pair (piece, block)</returns>
         public Tuple<int, int> GetNextBlock(string peerId)
         {
-            // TODO (croata): selecionar proximo bloco a ser baixado
-            return null;
+            var bitFieldsCopy = new Dictionary<string, BitArray>();
+            lock (bitFields)
+            {
+                foreach (var kv in bitFields)
+                {
+                    bitFieldsCopy[kv.Key] = new BitArray(kv.Value);
+                }
+            }
+
+            string myBitField;
+            lock (hfile)
+            {
+                myBitField = hfile.BitField;
+            }
+
+            // possible = other & ~mine
+            BitArray possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
+
+            var counts = new List<Tuple<int, int>>();
+            for (int i = 0; i < possible.Length; i++)
+            {
+                if (possible[i])
+                {
+                    counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
+                }
+            }
+            if (counts.Count == 0)
+            {
+                return null;
+            }
+            var orderedCounts = counts.OrderBy(c => c.Item2);
+
+            Tuple<int, int> result = null;
+            foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
+            {
+                Piece piece = hfile.Pieces[idxPiece];
+                for (int idxBlock = 0; idxBlock < piece.BitField.Length; idxBlock++)
+                {
+                    if (piece.BitField[idxBlock] == '0')
+                    {
+                        bool contains;
+                        lock (requestedBlocks)
+                        {
+                            contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
+                        }
+                        if (!contains)
+                        {
+                            result = Tuple.Create(idxPiece, idxBlock);
+                            lock (requestedBlocks)
+                            {
+                                requestedBlocks.Add(result);
+                            }
+                            goto end;
+                        }
+                    }
+                }
+            }
+            
+            end: return result;
         }
 
         public void cancel()
@@ -92,6 +155,13 @@ namespace Hermes
                 stream.Seek(offset, SeekOrigin.Begin);
                 stream.Write(byteData, 0, byteData.Length);
             }
+            Logger.log("Downloader", "Downloaded (piece, block) = (" + piece + ", " + block + ") for " + hfile.ID);
+
+            // Got requested block
+            lock (requestedBlocks)
+            {
+                requestedBlocks.Remove(Tuple.Create(piece, block));
+            }
 
             // Update hfile
             bool completed;
@@ -109,7 +179,6 @@ namespace Hermes
             lock (hfile)
             {
                 hfile.Percentage += 1.0 * byteData.Length / hfile.Size;
-                Logger.log(hfile.ID, "Percentage: " + hfile.Percentage);
             }
 
             // Send event Have
