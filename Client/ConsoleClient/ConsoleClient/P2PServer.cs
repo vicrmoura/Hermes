@@ -327,7 +327,7 @@ namespace Hermes
         public void SendHave(HFile hfile, int piece)
         {
             // TODO (harry): adicionar na fila concorrente
-            throw new NotImplementedException();
+           // throw new NotImplementedException();
         }
     }
 }

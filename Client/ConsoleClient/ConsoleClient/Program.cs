@@ -182,6 +182,9 @@ namespace Hermes
                 }
             });          
             Console.WriteLine("[OK]");
+
+            Task.Run(() => manageCanceledDownloads());
+
         }
         
         private static string LocalIPAddress()
@@ -460,6 +463,34 @@ namespace Hermes
             }
         }
 
+        private static void manageCanceledDownloads()
+        {
+            while (!quit)
+            {
+                lock (files)
+                {
+                    List<string> toBeRemoved = new List<string>();
+                    foreach (var file in files)
+                    {
+
+                        lock (file.Value)
+                        {
+                            if (file.Value.Status == StatusType.Canceled)
+                            {
+                                toBeRemoved.Add(file.Key);
+                            }
+                        }
+                    }
+                    foreach (var key in toBeRemoved)
+                    {
+                        files.Remove(key);
+                        Logger.log("CANCELMANAGER", "Canceled downloading " + key);
+                    }
+                }
+                System.Threading.Thread.Sleep(10000);
+            }
+        }
+
         // TODO: ExecuteExecutewnload
         private static void ExecuteDownload(uint id)
         {
@@ -498,7 +529,10 @@ namespace Hermes
             bool started = downloadManager.startDownload(response.Item1, response.Item2.ToList());
             if (started)
             {
-                files[fileId] = response.Item1;
+                lock (files)
+                {
+                    files[fileId] = response.Item1;
+                }
                 Console.WriteLine("Started download of " + fileId);
             }
             else
