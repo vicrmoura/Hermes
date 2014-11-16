@@ -154,7 +154,6 @@ namespace Hermes
             return searchResults;
         }
 
-
         public Dictionary<string, dynamic> Heartbeat(Dictionary<string, HFile> files, string peerID, string peerIP, string peerPort, int maxPeers = 0)
         {
             Dictionary<string, string> fileStats = new Dictionary<string, string>();
@@ -189,8 +188,54 @@ namespace Hermes
             Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
             HeartbeatInterval = jsonResponse["interval"];
             Logger.log(TAG, "Heartbeat successfully concluded.");
-            Dictionary<string, dynamic> peers = jsonResponse["peers"];
             return jsonResponse["peers"];
+        }
+
+        public Tuple<HFile, Dictionary<string, dynamic>[]> GetMetaInfo(string fileID, string peerID, int maxPeers = 0)
+        {
+            var dict = new Dictionary<string, dynamic> {
+                 {"type", "info"},
+                 {"fileID", fileID},
+                 {"peerID", peerID},
+            };
+            if (maxPeers > 0)
+            {
+                dict.Add("maxPeers", maxPeers);
+            }
+
+            Logger.log(TAG, "Sending Metainfo request for " + fileID);
+            string response = SendMessage(jsonSerializer.Serialize(dict));
+            if (response == null)
+            {
+                throw new IOException();
+            }
+            Dictionary<string, dynamic> jsonResponse = jsonSerializer.Deserialize<Dictionary<string, dynamic>>(response);
+            Logger.log(TAG, "Metainfo request successfully concluded.");
+            
+            HeartbeatInterval = jsonResponse["interval"];
+            HFile file = new HFile();
+            file.Name = jsonResponse["name"];
+            file.Size = jsonResponse["size"]; 
+            file.BlockSize = jsonResponse["blockSize"];
+            file.PieceSize = jsonResponse["pieceSize"];
+            file.Status = StatusType.Started;
+            file.ID = fileID;
+            ArrayList sha1s = jsonResponse["piecesSHA1S"];
+            file.Pieces = new Piece[sha1s.Count];
+            for (int i = 0; i < sha1s.Count; i++)
+            {
+                // TODO Croata: Complete Piece initialization
+                file.Pieces[i] = new Piece();
+                file.Pieces[i].Sha = (string)sha1s[i];
+            }
+            ArrayList peersResponse = jsonResponse["peers"];
+            Dictionary<string, dynamic>[] peers = new Dictionary<string, dynamic>[peersResponse.Count];
+            for (int i = 0; i < peersResponse.Count; i++)
+            {
+                peers[i] = (Dictionary<string, dynamic>)peersResponse[i];
+            }
+
+            return new Tuple<HFile, Dictionary<string, dynamic>[]>(file, peers);
         }
     }
 }

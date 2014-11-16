@@ -175,7 +175,6 @@ namespace Hermes
                 fileNames.Add(file.Name);
             }
             SHA1 shaConverter = new SHA1CryptoServiceProvider();
-            TrackerClient client = new TrackerClient(TrackerIP, TrackerPort);
             foreach (string filePath in Directory.EnumerateFiles(BaseFolder))
             {
                 string fileName = Path.GetFileName(filePath);
@@ -205,7 +204,7 @@ namespace Hermes
                                 file.Pieces[i].Size = bytesRead;
                             }
                         }
-                        string fileID = client.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                        string fileID = trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
                         file.ID = fileID;
                         files[fileID] = file;   
                     }
