@@ -228,7 +228,16 @@ namespace Hermes
         {
             uint limit = 10, offset = 0;
             uint page = 1;
-            searchResults = trackerClient.Query(input[1], limit, offset);
+            try
+            {
+                searchResults = trackerClient.Query(input[1], limit, offset);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("There was a problem with the connection to the server");
+                Logger.log("SEARCH", "[ERROR] " + e.ToString());
+                return;
+            } 
             bool printTable = true;
             string command;
             do
@@ -262,8 +271,18 @@ namespace Hermes
                         }
                         page++;
                         offset = limit * (page - 1);
-                        Dictionary<string, dynamic>[] newSearchResults = trackerClient.Query(input[1], limit, offset);
-                        if (searchResults.Length == 0)
+                        Dictionary<string, dynamic>[] newSearchResults = null;
+                        try
+                        {
+                            newSearchResults = trackerClient.Query(input[1], limit, offset);
+                        }
+                        catch (Exception e) 
+                        {
+                            Console.WriteLine("There was a problem with the connection to the server");
+                            Logger.log("SEARCH", "[ERROR] " + e.ToString());
+                            break;
+                        }
+                        if (newSearchResults.Length == 0)
                         {
                             Console.WriteLine("This is the last page");
                             printTable = false;
@@ -295,7 +314,7 @@ namespace Hermes
                         break;
                     }
                     uint id = 0;
-                    if (!UInt32.TryParse(command, out id) || id < offset + 1 || id > offset + limit + 1)
+                    if (!UInt32.TryParse(command, out id) || id < offset + 1 || id > searchResults.Length)
                     {
                         Console.WriteLine("Invalid command");
                         printTable = false;

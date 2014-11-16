@@ -66,6 +66,7 @@ namespace Hermes
                         }
 
                         tcpClient = new TcpClient(TrackerIP, port);
+                        tcpClient.ReceiveTimeout = 5000;
                         Logger.log(TAG, "Connected");
                     }
                     Stream s = null;
