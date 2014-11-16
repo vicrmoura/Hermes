@@ -94,15 +94,29 @@ namespace Hermes
             }
         }
 
-        public void cancel(string fileId)
+        public string cancel(string partialFileId)
         {
             FileDownloadingInfo fileInfo;
             lock (filesInfo)
             {
-                if (!filesInfo.ContainsKey(fileId))
+                var possibilities = filesInfo.Keys.Where(k => k.StartsWith(partialFileId)).ToList();
+                if (possibilities.Count == 0)
                 {
-                    return;
+                    return "No such file";
                 }
+                if (possibilities.Count > 1)
+                {
+                    string ans = "Please specify file. Possibilities: ";
+                    bool first = true;
+                    foreach (var possibility in possibilities)
+                    {
+                        if (first) { first = false; }
+                        else { ans += ", "; }
+                        ans += possibility;
+                    }
+                    return ans;
+                }
+                string fileId = possibilities[0];
                 fileInfo = filesInfo[fileId];
                 filesInfo.Remove(fileId);
             }
@@ -111,6 +125,7 @@ namespace Hermes
                 client.cancel();
             }
             fileInfo.downloader.cancel();
+            return "success";
         }
     }
 }

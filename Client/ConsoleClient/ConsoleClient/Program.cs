@@ -453,14 +453,21 @@ namespace Hermes
         // TODO: ExecuteCancel
         private static void ExecuteCancel()
         {
-            if (input.Length == 2)
+            if (input.Length != 2)
+            {
+                Console.WriteLine("Missing fileID");
+                return;
+            }
+            string message = downloadManager.cancel(input[1]);
+            if (message == "success")
             {
                 Console.WriteLine("Canceling download of " + input[1]);
             }
             else
             {
-                Console.WriteLine("Missing fileID");
+                Console.WriteLine(message);
             }
+            
         }
 
         private static void ExecuteHelp()
