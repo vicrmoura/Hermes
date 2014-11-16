@@ -10,6 +10,10 @@ namespace Hermes
 {
     class P2PDownloader
     {
+        /* Constants */
+
+        private const string DOWNLOADING = ".downloading";
+
         /* Fields */
 
         public readonly string FileID;
@@ -26,7 +30,7 @@ namespace Hermes
             this.FileID = fileID;
             this.hfile = hfile;
             this.server = server;
-            this.filePath = Path.Combine(Program.BaseFolder, hfile.Name + ".downloading");
+            this.filePath = Path.Combine(Program.BaseFolder, hfile.Name + DOWNLOADING);
             this.bitFields = new Dictionary<string, BitArray>();
 
             lock (hfile)
@@ -93,6 +97,11 @@ namespace Hermes
                 hfile.Pieces[piece].BitField = new string(bits);
                 completed = hfile.Pieces[piece].BitField.All(c => c == '1');
             }
+            lock (hfile)
+            {
+                hfile.Percentage += 1.0 * byteData.Length / hfile.Size;
+                Logger.log(hfile.ID, "Percentage: " + hfile.Percentage);
+            }
 
             // Send event Have
             if (completed)
@@ -106,11 +115,21 @@ namespace Hermes
                     }
                     bits[piece] = '1';
                     hfile.BitField = new string(bits);
+                    completed = hfile.BitField.All(c => c == '1');
                 }
                 server.SendHave(hfile, piece);
             }
 
-            // TODO (croata): remove ".downloading" extension
+            // Remove .downloading
+            if (completed)
+            {
+                lock (hfile)
+                {
+                    hfile.Status = StatusType.Completed;
+                    hfile.PercentageSpecified = false;
+                    File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length));
+                }
+            }
         }
     }
 }
