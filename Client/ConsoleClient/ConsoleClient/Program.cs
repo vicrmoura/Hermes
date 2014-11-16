@@ -41,6 +41,7 @@ namespace Hermes
         private static Dictionary<string, HFile> files;
         private static TrackerClient trackerClient;
         private static Dictionary<string, dynamic>[] searchResults;
+        private static DownloadManager downloadManager;
 
         private static string TrackerIP;
         private static string TrackerPort;
@@ -136,6 +137,10 @@ namespace Hermes
 
             Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
             P2PServer p2pServer = new P2PServer(PeerId, files);
+
+            // Start download manager
+
+            downloadManager = new DownloadManager(PeerId, p2pServer);
 
 
             Console.WriteLine("[OK]");
