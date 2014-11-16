@@ -145,13 +145,8 @@ namespace Hermes
             ArrayList queryResponse = jsonResponse["results"];
 
             Logger.log(TAG, "Search of " + fileName + " successfully concluded, " + queryResponse.Count + " results received.");
-            
-            Dictionary<string, dynamic>[] searchResults = new Dictionary<string, dynamic>[queryResponse.Count];
-            for (int i = 0; i < queryResponse.Count; i++)
-            {
-                searchResults[i] = (Dictionary<string, dynamic>)queryResponse[i];
-            }
-            return searchResults;
+
+            return ((ArrayList)queryResponse).Cast<Dictionary<string, dynamic>>().ToArray();
         }
 
         public Dictionary<string, dynamic> Heartbeat(Dictionary<string, HFile> files, string peerID, string peerIP, string peerPort, int maxPeers = 0)

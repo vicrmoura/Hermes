@@ -161,11 +161,19 @@ namespace Hermes
                     Thread.Sleep(trackerClient.HeartbeatInterval);
                     if (files.Count > 0)
                     {
+                        Dictionary<string, dynamic> fileUpdates;
                         try
                         {
-                            trackerClient.Heartbeat(files, PeerId, LocalIP, LocalPort);
+                            fileUpdates = trackerClient.Heartbeat(files, PeerId, LocalIP, LocalPort);
+                            foreach (var fileID in fileUpdates.Keys) {
+                                downloadManager.updatePeers(fileID, ((ArrayList)fileUpdates[fileID]).Cast<Dictionary<string, dynamic>>().ToList());
+                            }
                         }
-                        catch (Exception) { }
+                        catch (Exception e)
+                        {
+                            Logger.log("HEARTBEAT", "[ERROR] " + e.ToString());
+                        }
+                        
                     }
                 }
             });          
@@ -287,28 +295,24 @@ namespace Hermes
                     {
                         break;
                     }
-                    try
+                    uint id = 0;
+                    if (!UInt32.TryParse(command, out id) || id < offset + 1 || id > offset + limit + 1)
                     {
-                        uint id = UInt32.Parse(command);
-                        if (id < offset + 1 || id > offset + limit + 1)
-                        {
-                            Console.WriteLine("Invalid ID");
-                            printTable = false;
-                            continue;
-                        }
-                        try
-                        {
-                            ExecuteDownload(id - 1);
-                        }
-                        catch (Exception e)
-                        {
-                            Console.WriteLine("Unable to download file");
-                            Logger.log("SEARCH" , "[ERROR] " + e.ToString());
-                        }
+                        Console.WriteLine("Invalid command");
                         printTable = false;
                         continue;
                     }
-                    catch (Exception) { }
+                    try
+                    {
+                        ExecuteDownload(id - 1);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine("Unable to download file");
+                        Logger.log("SEARCH" , "[ERROR] " + e.ToString());
+                    }
+                    printTable = false;
+                    break;
                 }
                 else
                 {
