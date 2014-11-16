@@ -50,37 +50,6 @@ namespace Hermes
             return true;            
         }
 
-        public void pauseDownload(string fileId)
-        {
-            lock(filesInfo) 
-            {
-                if (!filesInfo.ContainsKey(fileId))
-                {
-                    return;
-                }
-                foreach (var client in filesInfo[fileId].clients)
-                {
-                    client.pause();
-                }
-            }   
-            
-        }
-
-        public void continueDownload(string fileId)
-        {
-            lock (filesInfo)
-            {
-                if (!filesInfo.ContainsKey(fileId))
-                {
-                    return;
-                }
-                foreach (var client in filesInfo[fileId].clients)
-                {
-                    client.unpause();
-                }
-            }   
-        }
-
         // should be called during heartbeat
         public void updatePeers(string fileId, List<Dictionary<string, dynamic>> peers)
         {
@@ -94,29 +63,42 @@ namespace Hermes
             }
         }
 
+        private string getPossibilitiesString(List<string> possibilities)
+        {
+            string ans = "Please specify file. Possibilities: ";
+            bool first = true;
+            foreach (var possibility in possibilities)
+            {
+                if (first) { first = false; }
+                else { ans += ", "; }
+                ans += possibility;
+            }
+            return ans;
+        }
+
+        // not thread safe
+        public Tuple<bool, string> evaluatePartialFileId(string partialFileId)
+        {
+            var possibilities = filesInfo.Keys.Where(k => k.StartsWith(partialFileId)).ToList();
+            if (possibilities.Count == 0)
+            {
+                return Tuple.Create(false, "No such file");
+            }
+            if (possibilities.Count > 1)
+            {
+                return Tuple.Create(false, getPossibilitiesString(possibilities));
+            }
+            return Tuple.Create(true, possibilities[0]);
+        }
+
         public string cancel(string partialFileId)
         {
             FileDownloadingInfo fileInfo;
             lock (filesInfo)
             {
-                var possibilities = filesInfo.Keys.Where(k => k.StartsWith(partialFileId)).ToList();
-                if (possibilities.Count == 0)
-                {
-                    return "No such file";
-                }
-                if (possibilities.Count > 1)
-                {
-                    string ans = "Please specify file. Possibilities: ";
-                    bool first = true;
-                    foreach (var possibility in possibilities)
-                    {
-                        if (first) { first = false; }
-                        else { ans += ", "; }
-                        ans += possibility;
-                    }
-                    return ans;
-                }
-                string fileId = possibilities[0];
+                var t = evaluatePartialFileId(partialFileId);
+                if (!t.Item1) return t.Item2;
+                string fileId = t.Item2;
                 fileInfo = filesInfo[fileId];
                 filesInfo.Remove(fileId);
             }
@@ -125,7 +107,39 @@ namespace Hermes
                 client.cancel();
             }
             fileInfo.downloader.cancel();
-            return "success";
+            return "Canceling download of " + fileInfo.file.ID;
+        }
+
+        public string pauseDownload(string partialFileId)
+        {
+            string fileId;
+            lock (filesInfo)
+            {
+                var t = evaluatePartialFileId(partialFileId);
+                if (!t.Item1) return t.Item2;
+                fileId = t.Item2;
+                foreach (var client in filesInfo[fileId].clients)
+                {
+                    client.pause();
+                }
+            }
+            return "Pausing download of " + fileId;
+        }
+
+        public string continueDownload(string partialFileId)
+        {
+            string fileId;
+            lock (filesInfo)
+            {
+                var t = evaluatePartialFileId(partialFileId);
+                if (!t.Item1) return t.Item2;
+                fileId = t.Item2;
+                foreach (var client in filesInfo[fileId].clients)
+                {
+                    client.unpause();
+                }
+            }
+            return "Continuing download of " + fileId;
         }
     }
 }

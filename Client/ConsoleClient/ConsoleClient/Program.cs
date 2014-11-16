@@ -431,27 +431,28 @@ namespace Hermes
         // TODO: ExecutePause
         private static void ExecutePause()
         {
-            if (input.Length == 2)
-            {
-                Console.WriteLine("Pausing download of " + input[1]);
-            }
-            else
+            if (input.Length != 2)
             {
                 Console.WriteLine("Missing fileID");
+                return;
             }
+
+            string message = downloadManager.pauseDownload(input[1]);
+            Console.WriteLine(message);
+            
         }
 
         // TODO: ExecuteContinue
         private static void ExecuteContinue()
         {
-            if (input.Length == 2)
-            {
-                Console.WriteLine("Continuing download of " + input[1]);
-            }
-            else
+            if (input.Length != 2)
             {
                 Console.WriteLine("Missing fileID");
+                return;
             }
+
+            string message = downloadManager.continueDownload(input[1]);
+            Console.WriteLine(message);
         }
 
         // TODO: ExecuteCancel
@@ -463,15 +464,7 @@ namespace Hermes
                 return;
             }
             string message = downloadManager.cancel(input[1]);
-            if (message == "success")
-            {
-                Console.WriteLine("Canceling download of " + input[1]);
-            }
-            else
-            {
-                Console.WriteLine(message);
-            }
-            
+            Console.WriteLine(message);
         }
 
         private static void ExecuteHelp()
