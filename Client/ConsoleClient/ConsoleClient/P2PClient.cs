@@ -116,7 +116,7 @@ namespace Hermes
                         }
                     }
 
-                    var tup = downloader.GetNextBlock();
+                    var tup = downloader.GetNextBlock(serverId);
                     if (tup == null)
                     {
                         Logger.log(logLabel, "Finished downloading");

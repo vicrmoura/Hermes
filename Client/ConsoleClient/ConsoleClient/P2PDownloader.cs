@@ -57,7 +57,7 @@ namespace Hermes
         /// The next (piece, block) to download. Returns null if finished
         /// </summary>
         /// <returns>The pair (piece, block)</returns>
-        public Tuple<int, int> GetNextBlock()
+        public Tuple<int, int> GetNextBlock(string peerId)
         {
             // TODO (croata): selecionar proximo bloco a ser baixado
             return null;
