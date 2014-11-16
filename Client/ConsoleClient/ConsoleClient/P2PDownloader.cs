@@ -49,8 +49,12 @@ namespace Hermes
 
         public void SetBitField(string peerName, string bitField)
         {
-            byte[] bitFieldData = Convert.FromBase64String(bitField);
-            bitFields[peerName] = new BitArray(bitFieldData);
+            BitArray ba = new BitArray(bitField.Length, false);
+            for (int i = 0; i < bitField.Length; i++)
+            {
+                ba[i] = (bitField[i] == '1');
+            }
+            bitFields[peerName] = ba;
         }
 
         /// <summary>

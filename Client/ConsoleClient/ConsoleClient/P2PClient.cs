@@ -90,7 +90,7 @@ namespace Hermes
                 
                 isDownloading = true;
                 Task t = Task.Run(() => clientListener(sr, sw, cv, unchokeCv));
-                System.Threading.Thread.Sleep(30000);
+                System.Threading.Thread.Sleep(3000);
                 while (isDownloading)
                 {
 

@@ -207,6 +207,11 @@ namespace Hermes
                     }
                 }
 
+                lock (uploaders)
+                {
+                    uploaders.Remove(peerId);
+                }
+
                 sw.Flush();
                 System.Threading.Thread.Sleep(1000); // wait for last messages to be sent and read
                 clientStream.Close();
