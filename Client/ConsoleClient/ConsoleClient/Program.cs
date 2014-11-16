@@ -9,6 +9,7 @@ using System.Configuration;
 using System.Security.Cryptography;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
@@ -58,7 +59,7 @@ namespace Hermes
         #region /* Main */
         static void Main(string[] args)
         {
-            Console.WriteLine("Hermes Console Client v0.1");
+            Console.WriteLine("Hermes Console Client v0.5");
 
             Initialize();
 
@@ -91,6 +92,10 @@ namespace Hermes
         private static void Initialize()
         {
             Console.WriteLine("Initializing...");
+
+            // Gracefully quit
+            handler = new ConsoleEventDelegate(ConsoleEventCallback);
+            SetConsoleCtrlHandler(handler, true);
 
             // Read Settings
 
@@ -377,6 +382,19 @@ namespace Hermes
             } while (true);
         }
 
+        private static string SizeToString(long size)
+        {
+            string[] suffixes = { "B", "kB", "MB", "GB" };
+            foreach (var suffix in suffixes)
+            {
+                if (size < kB)
+                {
+                    return size + suffix;
+                }
+                size /= kB;
+            }
+            return size + "TB";
+        }
         #endregion
 
         #region /* Execute Methods */
@@ -398,11 +416,16 @@ namespace Hermes
             }
         }
 
-        // TODO: ExecuteList
         private static void ExecuteList()
         {
-            Console.WriteLine("|--- Name ---|--- ID ---|--- size ---|--- % completed ---|");
-            Console.WriteLine("...");
+            Console.WriteLine("|------------------ Name ------------------|-- size --|-- % --|--- Status ---|");
+            foreach (var hfile in files.Values)
+            {
+                Console.Write(string.Format("| {0,-40} ", hfile.Name.Substring(0, Math.Min(40, hfile.Name.Length))));
+                Console.Write(string.Format("| {0,8} ", SizeToString(hfile.Size)));
+                Console.Write(string.Format("| {0,5:0.0} ", hfile.Percentage*100));
+                Console.WriteLine(string.Format("| {0,12} |", hfile.Status));
+            }
         }
 
         // TODO: ExecuteStats
@@ -592,6 +615,7 @@ namespace Hermes
         // TODO: ExecuteQuit
         private static void ExecuteQuit()
         {
+            if (quit) return;
             quit = true;
 
             Console.Write("Closing connections...  ");
@@ -643,6 +667,24 @@ namespace Hermes
         }
         #endregion
 
+        #endregion
+
+        #region Gracefully Quit
+        private delegate bool ConsoleEventDelegate(int eventType);
+
+        private static ConsoleEventDelegate handler;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool SetConsoleCtrlHandler(ConsoleEventDelegate callback, bool add);
+
+        private static bool ConsoleEventCallback(int eventType)
+        {
+            if (eventType == 2)
+            {
+                ExecuteQuit();
+            }
+            return false;
+        }
         #endregion
     }
 }
