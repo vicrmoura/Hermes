@@ -384,11 +384,11 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 self.data = json.loads(message)
             except ValueError, e:
                 log_bad_json("type")
-                continue
+                break
 
             if "type" not in self.data:
                 log_missing_field("type", self.data)
-                continue
+                break
 
             if self.data["type"] == "query":
                 response = self.handle_search_query()
@@ -400,15 +400,18 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 response = self.handle_metainfo()
             else:
                 log("Unable to match type: {} from: {}".format(self.data["type"], self.data))
-                continue
+                break
 
-            if response != "":
+            if response == "":
+                break
+            else:
                 try:
                     self.request.sendall(response)
                     log("Response Sent: {}".format(response))
                 except Exception:
                     log ("Connection reset by peer")
                     break
+
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
