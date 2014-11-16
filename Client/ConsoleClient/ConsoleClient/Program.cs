@@ -468,10 +468,37 @@ namespace Hermes
 
             Console.WriteLine("File Id:" + fileId);
             Console.WriteLine("PeerId:" + PeerId);
-            
+            if (files.ContainsKey(fileId))
+            {
+                lock (files[fileId])
+                {
+                    if (files[fileId].Status == StatusType.Downloading)
+                    {
+                        Console.WriteLine("This file is already being downloaded");
+                        return;
+                    }
+                    else if (files[fileId].Status == StatusType.Completed)
+                    {
+                        Console.WriteLine("This file was already downloaded");
+                        return;
+                    }
+                    else if (files[fileId].Status == StatusType.Paused)
+                    {
+                        Console.WriteLine("This file is paused... You can continued the download by typing 'continue <id>'");
+                        return;
+                    }
+                    else if (files[fileId].Status == StatusType.Canceled)
+                    {
+                        Console.WriteLine("This download was previously canceled. Try again later.");
+                        return;
+                    }
+                }
+            }
+
             bool started = downloadManager.startDownload(response.Item1, response.Item2.ToList());
             if (started)
             {
+                files[fileId] = response.Item1;
                 Console.WriteLine("Started download of " + fileId);
             }
             else

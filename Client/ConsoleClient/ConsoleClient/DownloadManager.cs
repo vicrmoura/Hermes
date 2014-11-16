@@ -19,12 +19,48 @@ namespace Hermes
         private Dictionary<string /*fileId*/, FileDownloadingInfo> filesInfo;
         private string myId;
         P2PServer server;
+        bool quitted;
 
         public DownloadManager(string myId, P2PServer server)
         {
             this.myId = myId;
             this.server = server;
             filesInfo = new Dictionary<string, FileDownloadingInfo>();
+            quitted = false;
+            Task.Run(() => manageCompletedDownloads());
+        }
+
+        public void quit(){
+            quitted = true;
+        }
+
+        public void manageCompletedDownloads()
+        {
+            while (!quitted)
+            {
+                lock (filesInfo)
+                {
+                    List<string> toBeRemoved = new List<string>();
+                    foreach (var fileInfo in filesInfo)
+                    {
+                        var file = fileInfo.Value.file;
+
+                        lock (file)
+                        {
+                            if (file.Status == StatusType.Completed)
+                            {
+                                toBeRemoved.Add(fileInfo.Key);
+                            }
+                        }
+                    }
+                    foreach (var key in toBeRemoved)
+                    {
+                        filesInfo.Remove(key);
+                        Logger.log("DOWNLOADMANAGER","Completed downloading " + key);
+                    }
+                }
+                System.Threading.Thread.Sleep(10000);
+            }
         }
 
         public bool startDownload(HFile file, List<Dictionary<string, dynamic>> peers)
@@ -102,6 +138,17 @@ namespace Hermes
                 fileInfo = filesInfo[fileId];
                 filesInfo.Remove(fileId);
             }
+            lock (fileInfo.file)
+            {
+                if (fileInfo.file.Status == StatusType.Completed)
+                {
+                    return "Download already completed";
+                }
+            }
+            lock (fileInfo.file)
+            {
+                fileInfo.file.Status = StatusType.Canceled;
+            }
             foreach (var client in fileInfo.clients)
             {
                 client.cancel();
@@ -123,6 +170,17 @@ namespace Hermes
                     client.pause();
                 }
             }
+            lock (filesInfo[fileId].file)
+            {
+                if (filesInfo[fileId].file.Status == StatusType.Completed)
+                {
+                    return "Download already completed";
+                }
+            }
+            lock (filesInfo[fileId].file)
+            {
+                filesInfo[fileId].file.Status = StatusType.Paused;
+            }
             return "Pausing download of " + fileId;
         }
 
@@ -138,6 +196,17 @@ namespace Hermes
                 {
                     client.unpause();
                 }
+            }
+            lock (filesInfo[fileId].file)
+            {
+                if (filesInfo[fileId].file.Status == StatusType.Completed)
+                {
+                    return "Download already completed";
+                }
+            }
+            lock (filesInfo[fileId].file)
+            {
+                filesInfo[fileId].file.Status = StatusType.Downloading;
             }
             return "Continuing download of " + fileId;
         }
