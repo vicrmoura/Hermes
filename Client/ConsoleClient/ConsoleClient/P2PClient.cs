@@ -38,8 +38,9 @@ namespace Hermes
             this.paused = false;
             this.unpauseCv = new object();
             this.logLabel = myId + ":" + downloader.FileID;
-            clientTask = Task.Run(() => runClient(ip, port));
             jsonSerializer = new JavaScriptSerializer();
+            clientTask = Task.Run(() => runClient(ip, port));
+            
         }
 
         private int lastRequestedPiece;
