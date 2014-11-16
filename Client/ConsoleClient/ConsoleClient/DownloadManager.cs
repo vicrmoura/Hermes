@@ -45,6 +45,7 @@ namespace Hermes
                     P2PClient client = new P2PClient(myId, peer["peerId"], fileInfo.downloader, peer["ip"], int.Parse(peer["port"]));
                     fileInfo.clients.Add(client);
                 }
+                filesInfo[file.ID] = fileInfo;
             }
             return true;            
         }
