@@ -116,7 +116,6 @@ namespace Hermes
                             }
                         }
                     }
-
                     var tup = downloader.GetNextBlock(serverId);
                     if (tup == null)
                     {

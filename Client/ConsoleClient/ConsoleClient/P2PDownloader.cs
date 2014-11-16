@@ -69,69 +69,80 @@ namespace Hermes
         /// <returns>The pair (piece, block)</returns>
         public Tuple<int, int> GetNextBlock(string peerId)
         {
-            lock (this)
+            Dictionary<string, BitArray> bitFieldsCopy;
+            string myBitField;
+            BitArray possible;
+            List<Tuple<int, int>> counts;
+            try
             {
-                var bitFieldsCopy = new Dictionary<string, BitArray>();
-                lock (bitFields)
+                lock (this)
                 {
-                    foreach (var kv in bitFields)
+                    bitFieldsCopy = new Dictionary<string, BitArray>();
+                    lock (bitFields)
                     {
-                        bitFieldsCopy[kv.Key] = new BitArray(kv.Value);
-                    }
-                }
-
-                string myBitField;
-                lock (hfile)
-                {
-                    myBitField = hfile.BitField;
-                }
-
-                // possible = other & ~mine
-                BitArray possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
-
-                var counts = new List<Tuple<int, int>>();
-                for (int i = 0; i < possible.Length; i++)
-                {
-                    if (possible[i])
-                    {
-                        counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
-                    }
-                }
-                if (counts.Count == 0)
-                {
-                    return null;
-                }
-                var orderedCounts = counts.OrderBy(c => c.Item2);
-
-                Tuple<int, int> result = null;
-                foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
-                {
-                    Piece piece = hfile.Pieces[idxPiece];
-                    for (int idxBlock = 0; idxBlock < piece.BitField.Length; idxBlock++)
-                    {
-                        if (piece.BitField[idxBlock] == '0')
+                        foreach (var kv in bitFields)
                         {
-                            bool contains;
-                            lock (requestedBlocks)
+                            bitFieldsCopy[kv.Key] = new BitArray(kv.Value);
+                        }
+                    }
+                    
+                    lock (hfile)
+                    {
+                        myBitField = hfile.BitField;
+                    }
+
+                    // possible = other & ~mine
+                    possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
+
+                    counts = new List<Tuple<int, int>>();
+                    for (int i = 0; i < possible.Length; i++)
+                    {
+                        if (possible[i])
+                        {
+                            counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
+                        }
+                    }
+                    if (counts.Count == 0)
+                    {
+                        return null;
+                    }
+                    var orderedCounts = counts.OrderBy(c => c.Item2);
+
+                    Tuple<int, int> result = null;
+                    foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
+                    {
+                        Piece piece = hfile.Pieces[idxPiece];
+                        for (int idxBlock = 0; idxBlock < piece.BitField.Length; idxBlock++)
+                        {
+                            if (piece.BitField[idxBlock] == '0')
                             {
-                                contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
-                            }
-                            if (!contains)
-                            {
-                                result = Tuple.Create(idxPiece, idxBlock);
+                                bool contains;
                                 lock (requestedBlocks)
                                 {
-                                    requestedBlocks.Add(result);
+                                    contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
                                 }
-                                goto end;
+                                if (!contains)
+                                {
+                                    result = Tuple.Create(idxPiece, idxBlock);
+                                    lock (requestedBlocks)
+                                    {
+                                        requestedBlocks.Add(result);
+                                    }
+                                    goto end;
+                                }
                             }
                         }
                     }
-                }
                 end:
-                Logger.log("DOWNLOADER", "Mandando bloco (" + result.Item1 + ", " + result.Item2 + ")");
-                return result;
+                    //Logger.log("DOWNLOADER", "Mandando bloco (" + result.Item1 + ", " + result.Item2 + ")");
+                    return result;
+                }
             }
+            catch (Exception e)
+            {
+                Logger.log("CROATA",e.ToString());
+            }
+            return null;
             
         }
 

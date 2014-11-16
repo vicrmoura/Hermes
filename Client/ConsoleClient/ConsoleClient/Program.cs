@@ -235,7 +235,7 @@ namespace Hermes
                     file.Percentage = 1.0;
                     file.Size = new FileInfo(filePath).Length;
                     file.PieceSize = (int)Math.Max(100*kB, file.Size/(10*kB)/100*100);
-                    file.BlockSize = Math.Max(1*kB, file.PieceSize / 100);
+                    file.BlockSize = Math.Max(10*kB, file.PieceSize / 100);
 
                     using (FileStream fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
                     {
