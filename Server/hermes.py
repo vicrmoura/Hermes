@@ -89,7 +89,7 @@ def check_heartbeat(fileID):
             log("Peer " + peerID + " removed from " + fileID)
 
 def sample_peers(fileID, peerID, maxPeers):
-    
+
     check_heartbeat(fileID)
 
     if peerID in file_info[fileID]["peers"]:
@@ -103,7 +103,6 @@ def sample_peers(fileID, peerID, maxPeers):
     # Reservoir sampling
     iterator = iter(file_info[fileID]["peers"])    
     result = [next(iterator) for _ in range(numOfPeers)]
-
     n = numOfPeers
     for item in iterator:
         n += 1
@@ -193,6 +192,9 @@ def process_heartbeat_inactive(fileID, peerID, port, ip):
 def process_heartbeat(files, peerID, port, ip, maxPeers):
     response = { "type": "heartbeatResponse", "peers": {}, "interval": HEARTBEAT_INTERVAL}
     for fileID, event in files.iteritems():
+        if fileID not in file_info_locks:
+            log("fileID " + fileID + " not found")
+            return ""
         with file_info_locks[fileID]:
             if event == "active":
                 process_heartbeat_active(fileID, peerID, port, ip)
@@ -213,8 +215,25 @@ def process_upload(fileName, size, pieceSize, blockSize, piecesSHA1S, peerID, po
                              "sha1s": piecesSHA1S,
                              "peers": {peerID: {"timestamp": current_time_ms(), "port": port, "ip": ip}}}
         update_search_map(fileName, fileID)
+    else:
+        with file_info_locks[fileID]:
+            file_info[fileID]["peers"][peerID] = {"timestamp": current_time_ms(), "port": port, "ip": ip}
     return { "type": "uploadResponse", "fileID": fileID, "interval": HEARTBEAT_INTERVAL}
 
+def process_metainfo(fileID, peerID, maxPeers):
+    if fileID not in file_info_locks:
+        log("fileID " + fileID + " not found")
+        return ""
+    with file_info_locks[fileID]:
+        return {"type": "infoResponse",
+                "name": file_info[fileID]["name"],
+                "size": file_info[fileID]["size"],
+                "pieceSize": file_info[fileID]["pieceSize"],
+                "blockSize": file_info[fileID]["blockSize"],
+                "piecesSHA1S": file_info[fileID]["sha1s"],
+                "peers": sample_peers(fileID, peerID, maxPeers),
+                "interval": HEARTBEAT_INTERVAL}
+        
 #### Protocol Handlers ####
 
 class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
@@ -324,6 +343,30 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             return ""
         return convert_data_jsonline(result)
 
+    def handle_metainfo(self):
+        if "fileID" not in self.data:
+            log_missing_field("fileID", self.data)
+            return ""
+        fileID = self.data["fileID"]
+
+        if "peerID" not in self.data:
+            log_missing_field("peerID", self.data)
+            return ""
+        peerID = self.data["peerID"]
+
+        maxPeers = MAX_PEERS_IN_RESPONSE
+        if "maxPeers" in self.data:
+            maxPeers = self.data["maxPeers"]
+            if maxPeers < 0:
+                log ("maxPeers should not be negative," + 
+                        " but is: {} from: {}".format(maxPeers, self.data))
+                return ""
+
+        result = process_metainfo(fileID, peerID, maxPeers)
+        if result == "":
+            return ""
+        return convert_data_jsonline(result)
+
     def handle(self):
         
         while True:
@@ -353,13 +396,19 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
                 response = self.handle_heartbeat()
             elif self.data["type"] == "upload":
                 response = self.handle_upload()
+            elif self.data["type"] == "info":
+                response = self.handle_metainfo()
             else:
                 log("Unable to match type: {} from: {}".format(self.data["type"], self.data))
                 continue
 
             if response != "":
-                self.request.sendall(response)
-                log("Response Sent: {}".format(response))
+                try:
+                    self.request.sendall(response)
+                    log("Response Sent: {}".format(response))
+                except Exception:
+                    log ("Connection reset by peer")
+                    break
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
     pass
