@@ -25,15 +25,8 @@ namespace Hermes
         [XmlAttribute(AttributeName = "status")]
         public StatusType Status;
 
-        private double percentage;
         [XmlAttribute(AttributeName = "percentage")]
-        public double Percentage
-        {
-            get { return percentage; }
-            set { percentage = value; PercentageSpecified = true; }
-        }
-        [XmlIgnore]
-        public bool PercentageSpecified;
+        public double Percentage;
 
         [XmlAttribute(AttributeName = "bitField")]
         public string BitField;

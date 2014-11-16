@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Collections;
 
 namespace Hermes
 {
@@ -131,7 +131,7 @@ namespace Hermes
                 lock (hfile)
                 {
                     hfile.Status = StatusType.Completed;
-                    hfile.PercentageSpecified = false;
+                    hfile.Percentage = 1.0;
                     File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length));
                 }
             }

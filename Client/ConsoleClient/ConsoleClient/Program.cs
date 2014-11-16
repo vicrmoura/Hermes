@@ -197,7 +197,7 @@ namespace Hermes
                     HFile file = new HFile();
                     file.Name = fileName;
                     file.Status = StatusType.Completed;
-                    file.PercentageSpecified = false;
+                    file.Percentage = 1.0;
                     file.Size = new FileInfo(filePath).Length;
                     file.PieceSize = (int)Math.Max(100*kB, file.Size/(10*kB)/100*100);
                     file.BlockSize = Math.Max(1*kB, file.PieceSize / 100);
@@ -207,17 +207,16 @@ namespace Hermes
                         byte[] buffer = new byte[file.PieceSize];
                         int N = (int)Math.Ceiling(1.0 * file.Size / file.PieceSize);
                         file.Pieces = new Piece[N];
+                        file.BitField = new string('1', N);
                         for (int i = 0; i < N; i++)
                         {
                             int bytesRead = fs.Read(buffer, 0, file.PieceSize);
                             byte[] sha = shaConverter.ComputeHash(buffer, 0, bytesRead);
                             file.Pieces[i] = new Piece() { Sha = Convert.ToBase64String(sha) };
-                            if (bytesRead != file.PieceSize)
-                            {
-                                file.Pieces[i].Size = bytesRead;
-                            }
+                            file.Pieces[i].Size = bytesRead;
+                            file.Pieces[i].BitField = new string('1', (int)Math.Ceiling(1.0 * bytesRead / file.BlockSize));
                         }
-                        string fileID = trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                        string fileID = "/v4qZ9bpq5HzllmfabzJ9/o515o=";// trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
                         file.ID = fileID;
                         files[fileID] = file;   
                     }
