@@ -69,65 +69,70 @@ namespace Hermes
         /// <returns>The pair (piece, block)</returns>
         public Tuple<int, int> GetNextBlock(string peerId)
         {
-            var bitFieldsCopy = new Dictionary<string, BitArray>();
-            lock (bitFields)
+            lock (this)
             {
-                foreach (var kv in bitFields)
+                var bitFieldsCopy = new Dictionary<string, BitArray>();
+                lock (bitFields)
                 {
-                    bitFieldsCopy[kv.Key] = new BitArray(kv.Value);
-                }
-            }
-
-            string myBitField;
-            lock (hfile)
-            {
-                myBitField = hfile.BitField;
-            }
-
-            // possible = other & ~mine
-            BitArray possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
-
-            var counts = new List<Tuple<int, int>>();
-            for (int i = 0; i < possible.Length; i++)
-            {
-                if (possible[i])
-                {
-                    counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
-                }
-            }
-            if (counts.Count == 0)
-            {
-                return null;
-            }
-            var orderedCounts = counts.OrderBy(c => c.Item2);
-
-            Tuple<int, int> result = null;
-            foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
-            {
-                Piece piece = hfile.Pieces[idxPiece];
-                for (int idxBlock = 0; idxBlock < piece.BitField.Length; idxBlock++)
-                {
-                    if (piece.BitField[idxBlock] == '0')
+                    foreach (var kv in bitFields)
                     {
-                        bool contains;
-                        lock (requestedBlocks)
+                        bitFieldsCopy[kv.Key] = new BitArray(kv.Value);
+                    }
+                }
+
+                string myBitField;
+                lock (hfile)
+                {
+                    myBitField = hfile.BitField;
+                }
+
+                // possible = other & ~mine
+                BitArray possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
+
+                var counts = new List<Tuple<int, int>>();
+                for (int i = 0; i < possible.Length; i++)
+                {
+                    if (possible[i])
+                    {
+                        counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
+                    }
+                }
+                if (counts.Count == 0)
+                {
+                    return null;
+                }
+                var orderedCounts = counts.OrderBy(c => c.Item2);
+
+                Tuple<int, int> result = null;
+                foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
+                {
+                    Piece piece = hfile.Pieces[idxPiece];
+                    for (int idxBlock = 0; idxBlock < piece.BitField.Length; idxBlock++)
+                    {
+                        if (piece.BitField[idxBlock] == '0')
                         {
-                            contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
-                        }
-                        if (!contains)
-                        {
-                            result = Tuple.Create(idxPiece, idxBlock);
+                            bool contains;
                             lock (requestedBlocks)
                             {
-                                requestedBlocks.Add(result);
+                                contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
                             }
-                            goto end;
+                            if (!contains)
+                            {
+                                result = Tuple.Create(idxPiece, idxBlock);
+                                lock (requestedBlocks)
+                                {
+                                    requestedBlocks.Add(result);
+                                }
+                                goto end;
+                            }
                         }
                     }
                 }
+                end:
+                Logger.log("DOWNLOADER", "Mandando bloco (" + result.Item1 + ", " + result.Item2 + ")");
+                return result;
             }
             
-            end: return result;
         }
 
         public void cancel()
@@ -157,55 +162,59 @@ namespace Hermes
             }
             Logger.log("Downloader", "Downloaded (piece, block) = (" + piece + ", " + block + ") for " + hfile.ID);
 
-            // Got requested block
-            lock (requestedBlocks)
-            {
-                requestedBlocks.Remove(Tuple.Create(piece, block));
-            }
 
-            // Update hfile
-            bool completed;
-            lock (hfile.Pieces[piece])
+            lock (this)
             {
-                char[] bits = hfile.Pieces[piece].BitField.ToCharArray();
-                if (bits[block] != '0')
+                // Update hfile
+                bool completed;
+                lock (hfile.Pieces[piece])
                 {
-                    throw new InvalidOperationException("Already possessed (piece, block) = (" + piece + ", " + block + ")");
-                }
-                bits[block] = '1';
-                hfile.Pieces[piece].BitField = new string(bits);
-                completed = hfile.Pieces[piece].BitField.All(c => c == '1');
-            }
-            lock (hfile)
-            {
-                hfile.Percentage += 1.0 * byteData.Length / hfile.Size;
-            }
-
-            // Send event Have
-            if (completed)
-            {
-                lock (hfile)
-                {
-                    char[] bits = hfile.BitField.ToCharArray();
-                    if (bits[piece] != '0')
+                    char[] bits = hfile.Pieces[piece].BitField.ToCharArray();
+                    if (bits[block] != '0')
                     {
-                        throw new InvalidOperationException("Already possessed piece = " + piece);
+                        throw new InvalidOperationException("Already possessed (piece, block) = (" + piece + ", " + block + ")");
                     }
-                    bits[piece] = '1';
-                    hfile.BitField = new string(bits);
-                    completed = hfile.BitField.All(c => c == '1');
+                    bits[block] = '1';
+                    hfile.Pieces[piece].BitField = new string(bits);
+                    completed = hfile.Pieces[piece].BitField.All(c => c == '1');
                 }
-                server.SendHave(hfile, piece);
-            }
-
-            // Remove .downloading
-            if (completed)
-            {
                 lock (hfile)
                 {
-                    hfile.Status = StatusType.Completed;
-                    hfile.Percentage = 1.0;
-                    File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length));
+                    hfile.Percentage += 1.0 * byteData.Length / hfile.Size;
+                }
+
+                // Send event Have
+                if (completed)
+                {
+                    lock (hfile)
+                    {
+                        char[] bits = hfile.BitField.ToCharArray();
+                        if (bits[piece] != '0')
+                        {
+                            throw new InvalidOperationException("Already possessed piece = " + piece);
+                        }
+                        bits[piece] = '1';
+                        hfile.BitField = new string(bits);
+                        completed = hfile.BitField.All(c => c == '1');
+                    }
+                    server.SendHave(hfile, piece);
+                }
+
+                // Remove .downloading
+                if (completed)
+                {
+                    lock (hfile)
+                    {
+                        hfile.Status = StatusType.Completed;
+                        hfile.Percentage = 1.0;
+                        File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length));
+                    }
+                }
+
+                // Got requested block
+                lock (requestedBlocks)
+                {
+                    requestedBlocks.Remove(Tuple.Create(piece, block));
                 }
             }
         }
