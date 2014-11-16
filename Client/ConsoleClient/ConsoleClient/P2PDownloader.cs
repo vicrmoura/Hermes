@@ -14,10 +14,10 @@ namespace Hermes
 
         public readonly string FileID;
 
-        private HFile hfile;
-        private string filePath;
-        private P2PServer server;
-        private Dictionary<string/*peerId*/, BitArray> bitFields;
+        private readonly HFile hfile;
+        private readonly string filePath;
+        private readonly P2PServer server;
+        private readonly Dictionary<string/*peerId*/, BitArray> bitFields;
 
         /* Constructor */
 
@@ -74,7 +74,7 @@ namespace Hermes
                 throw new InvalidOperationException("Alguém cagou o pau nos dummies");
             }
 
-            using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.Write))
+            using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
             {
                 stream.Seek(offset, SeekOrigin.Begin);
                 stream.Write(byteData, 0, byteData.Length);
@@ -109,6 +109,8 @@ namespace Hermes
                 }
                 server.SendHave(hfile, piece);
             }
+
+            // TODO (croata): remove ".downloading" extension
         }
     }
 }
