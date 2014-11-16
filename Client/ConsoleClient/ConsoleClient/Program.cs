@@ -243,9 +243,12 @@ namespace Hermes
                             file.Pieces[i].Size = bytesRead;
                             file.Pieces[i].BitField = new string('1', (int)Math.Ceiling(1.0 * bytesRead / file.BlockSize));
                         }
-                        string fileID = "/v4qZ9bpq5HzllmfabzJ9/o515o=";// trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
-                        file.ID = fileID;
-                        files[fileID] = file;   
+                        try
+                        {
+                            trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                        } catch(Exception e) {
+                            Logger.log("CRAWLER", "[ERROR] " + e.ToString());
+                        }
                     }
                 }
             }
