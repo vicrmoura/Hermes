@@ -208,29 +208,38 @@ namespace Hermes
             Logger.log(TAG, "Metainfo request successfully concluded.");
             
             HeartbeatInterval = jsonResponse["interval"];
+            
             HFile file = new HFile();
             file.Name = jsonResponse["name"];
             file.Size = jsonResponse["size"]; 
             file.BlockSize = jsonResponse["blockSize"];
             file.PieceSize = jsonResponse["pieceSize"];
-            file.Status = StatusType.Started;
+            file.Status = StatusType.Downloading;
             file.ID = fileID;
+            file.Percentage = 0;
+
+            int ratio = file.PieceSize / file.BlockSize;
+            int lastPieceSize = (int)(file.Size % file.PieceSize);
+
             ArrayList sha1s = jsonResponse["piecesSHA1S"];
             file.Pieces = new Piece[sha1s.Count];
+            file.BitField = new string('0', sha1s.Count);
             for (int i = 0; i < sha1s.Count; i++)
             {
-                // TODO Croata: Complete Piece initialization
                 file.Pieces[i] = new Piece();
                 file.Pieces[i].Sha = (string)sha1s[i];
-            }
-            ArrayList peersResponse = jsonResponse["peers"];
-            Dictionary<string, dynamic>[] peers = new Dictionary<string, dynamic>[peersResponse.Count];
-            for (int i = 0; i < peersResponse.Count; i++)
-            {
-                peers[i] = (Dictionary<string, dynamic>)peersResponse[i];
+                if (i == sha1s.Count-1 && lastPieceSize != 0)
+                {
+                    file.Pieces[i].Size = lastPieceSize;
+                    file.Pieces[i].BitField = new string('0', (int)Math.Ceiling(1.0 * lastPieceSize / file.BlockSize));
+                }
+                else
+                {
+                    file.Pieces[i].BitField = new string('0', ratio);
+                }
             }
 
-            return new Tuple<HFile, Dictionary<string, dynamic>[]>(file, peers);
+            return Tuple.Create(file, ((ArrayList)jsonResponse["peers"]).Cast<Dictionary<string, dynamic>>().ToArray());
         }
     }
 }
