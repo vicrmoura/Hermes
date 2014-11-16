@@ -8,7 +8,7 @@ namespace Hermes
 {
     class FileDownloadingInfo
     {
-        public List<Dictionary<string, string>> peersInfo; // ip, port, peerId
+        public List<Dictionary<string, dynamic>> peersInfo; // ip, port, peerId
         public HFile file;
         public P2PDownloader downloader; // downloader (resposible for handling the hard disk accesses)
         public List<P2PClient> clients; // current connected clients
@@ -27,7 +27,7 @@ namespace Hermes
             filesInfo = new Dictionary<string, FileDownloadingInfo>();
         }
 
-        public bool startDownload(HFile file, List<Dictionary<string, string>> peers)
+        public bool startDownload(HFile file, List<Dictionary<string, dynamic>> peers)
         {
             lock (filesInfo)
             {
@@ -81,7 +81,7 @@ namespace Hermes
         }
 
         // should be called during heartbeat
-        public void updatePeers(string fileId, List<Dictionary<string, string>> peers)
+        public void updatePeers(string fileId, List<Dictionary<string, dynamic>> peers)
         {
             lock (filesInfo)
             {

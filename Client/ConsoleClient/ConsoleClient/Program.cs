@@ -296,7 +296,15 @@ namespace Hermes
                             printTable = false;
                             continue;
                         }
-                        ExecuteDownload(id + 1);
+                        try
+                        {
+                            ExecuteDownload(id - 1);
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine("Unable to download file");
+                            Logger.log("SEARCH" , "[ERROR] " + e.ToString());
+                        }
                         printTable = false;
                         continue;
                     }
@@ -399,30 +407,21 @@ namespace Hermes
         // TODO: ExecuteExecutewnload
         private static void ExecuteDownload(uint id)
         {
-            if (input.Length != 2)
-            {
-                Console.WriteLine("Missing fileID");
-                return;
-            }
+            string fileId = searchResults[id]["fileID"];
+            var response = trackerClient.GetMetaInfo(fileId, PeerId);
 
-            // dummies and more dummies
-            Dictionary<string, string> x = new Dictionary<string, string>();
-            x["peerId"] = "Harry1";
-            x["ip"] = "127.0.0.1";
-            x["port"] = P2PServer.SERVER_PORT + "";
-            Dictionary<string, string> y = new Dictionary<string, string>();
-            y["peerId"] = "Harry2";
-            y["ip"] = "127.0.0.1";
-            y["port"] = P2PServer.SERVER_PORT + "";
-            List<Dictionary<string, string>> peers = new List<Dictionary<string, string>>();
-            peers.Add(x);
-            peers.Add(y);
-            // end of dummies
-
-            //downloadManager.startDownload(input[1]);
-
-           // Console.WriteLine("Started download of " + fileId
+            Console.WriteLine("File Id:" + fileId);
+            Console.WriteLine("PeerId:" + PeerId);
             
+            bool started = downloadManager.startDownload(response.Item1, response.Item2.ToList());
+            if (started)
+            {
+                Console.WriteLine("Started download of " + fileId);
+            }
+            else
+            {
+                Console.WriteLine("This file is already being downloaded");
+            }
         }
 
         // TODO: ExecutePause
