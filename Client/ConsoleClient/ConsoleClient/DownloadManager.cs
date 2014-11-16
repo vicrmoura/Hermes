@@ -42,7 +42,7 @@ namespace Hermes
                 fileInfo.clients = new List<P2PClient>();
                 foreach (var peer in peers)
                 {
-                    P2PClient client = new P2PClient(myId, peer["peerId"], fileInfo.downloader, peer["ip"], int.Parse(peer["port"]));
+                    P2PClient client = new P2PClient(myId, peer["peerID"], fileInfo.downloader, peer["ip"], int.Parse(peer["port"]));
                     fileInfo.clients.Add(client);
                 }
                 filesInfo[file.ID] = fileInfo;
