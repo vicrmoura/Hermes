@@ -28,7 +28,6 @@ namespace Hermes
             { "upload",   new TSSA("",            "Crawl BaseFolder and upload metainfos for not-yet-" + spaces + "tracked files", ExecuteUpload) },
             { "search",   new TSSA("<string>",    "Search a file containing <string> in database", ExecuteSearch) },
             { "list",     new TSSA("[<filter>]",  "List files info: file name, fileID, size, percentage" + spaces + "completed, amount of running threads, state (=filter)." + spaces + "Filters (subset of): {completed, downloading, paused}", ExecuteList) },
-            { "stats",    new TSSA("",            "Statistics: total downloading files, total uploading" + spaces + "files, total connections", ExecuteStats) },
             { "base",     new TSSA("[<path>]",    "Show [or set] BaseFolder", ExecuteBase) },
             { "ip",       new TSSA("[<ip:port>]", "Show [or set] local IP and port", ExecuteIP) },
             { "pause",    new TSSA("<fileID>",    "Pause downloading <fileID>", ExecutePause) },
@@ -121,10 +120,6 @@ namespace Hermes
 
             Console.WriteLine("[OK]");
 
-            // Initializing TrackerClient
-
-            trackerClient = new TrackerClient(TrackerIP, TrackerPort);
-
             // Load database
 
             Console.Write(string.Format(" * {0,-30}", "Load database"));
@@ -142,23 +137,25 @@ namespace Hermes
             }
             Console.WriteLine("[OK]");
 
-            // Start p2p-server
-
-            Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
-            P2PServer p2pServer = new P2PServer(PeerId, files, int.Parse(LocalPort));
-
-            // Start download manager
-
-            downloadManager = new DownloadManager(PeerId, p2pServer);
-
-
-            Console.WriteLine("[OK]");
-
             // Start crawling BaseFolder
 
             Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
             StartCrawlingBaseFolder();
             Console.WriteLine("[OK]");
+
+            // Initializing TrackerClient
+
+            trackerClient = new TrackerClient(TrackerIP, TrackerPort);
+
+            // Start p2p-server
+
+            Console.Write(string.Format(" * {0,-30}", "Start p2p-server"));
+            P2PServer p2pServer = new P2PServer(PeerId, files, int.Parse(LocalPort));
+            Console.WriteLine("[OK]");
+
+            // Start download manager
+
+            downloadManager = new DownloadManager(PeerId, p2pServer);
 
             // Start heartbeat
             
@@ -189,7 +186,6 @@ namespace Hermes
             Console.WriteLine("[OK]");
 
             Task.Run(() => manageCanceledDownloads());
-
         }
         
         private static string LocalIPAddress()
@@ -263,6 +259,22 @@ namespace Hermes
                         }
                     }
                 }
+                else if (fileNames.Contains(fileName))
+                {
+                    fileNames.Remove(fileName);
+                }
+            }
+            var fileIDs = new List<string>();
+            foreach (var kv in files)
+            {
+                if (fileNames.Contains(kv.Value.Name))
+                {
+                    fileIDs.Add(kv.Key);
+                }
+            }
+            foreach (var fileID in fileIDs)
+            {
+                files.Remove(fileID);
             }
         }
 
@@ -426,14 +438,6 @@ namespace Hermes
                 Console.Write(string.Format("| {0,5:0.0} ", hfile.Percentage*100));
                 Console.WriteLine(string.Format("| {0,12} |", hfile.Status));
             }
-        }
-
-        // TODO: ExecuteStats
-        private static void ExecuteStats()
-        {
-            Console.WriteLine("Downloading: x files");
-            Console.WriteLine("Uploading:   y files");
-            Console.WriteLine("...");
         }
 
         private static void ExecuteBase()
