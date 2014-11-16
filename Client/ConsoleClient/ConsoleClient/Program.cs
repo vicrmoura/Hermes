@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Net;
-using System.Net.NetworkInformation; 
-using System.Net.Sockets;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -95,8 +92,7 @@ namespace Hermes
             // Read Settings
 
             Console.Write(string.Format(" * {0,-30}", "Read Settings"));
-
-            LocalIP = LocalIPAddress();
+            LocalIP = ConfigurationManager.AppSettings["LocalIP"];
             LocalPort = ConfigurationManager.AppSettings["LocalPort"];
             TrackerIP = ConfigurationManager.AppSettings["TrackerIP"];
             TrackerPort = ConfigurationManager.AppSettings["TrackerPort"];
@@ -183,29 +179,6 @@ namespace Hermes
             });          
             Console.WriteLine("[OK]");
         }
-        
-        private static string LocalIPAddress()
-        {
-            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
-            {
-                var addr = ni.GetIPProperties().GatewayAddresses.FirstOrDefault();
-                if (addr != null && !addr.Address.ToString().Equals("0.0.0.0"))
-                {
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 || ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet)
-                    {
-                        foreach (UnicastIPAddressInformation ip in ni.GetIPProperties().UnicastAddresses)
-                        {
-                            if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
-                            {
-                                return ip.Address.ToString();
-                            }
-                        }
-                    }
-                }
-            }
-            return String.Empty;
-    
-        }
 
         private static void StartCrawlingBaseFolder()
         {
@@ -245,9 +218,13 @@ namespace Hermes
                         }
                         try
                         {
-                            trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
-                        } catch(Exception e) {
-                            Logger.log("CRAWLER", "[ERROR] " + e.ToString());
+                            string fileID = trackerClient.UploadMetaInfo(file, PeerId, LocalIP, LocalPort);
+                            file.ID = fileID;
+                            files[fileID] = file;
+                        }
+                        catch (IOException e)
+                        {
+                            Logger.log("CRAWLER", e.Message);
                         }
                     }
                 }
