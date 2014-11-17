@@ -100,10 +100,12 @@ namespace Hermes
             }
         }
 
-
-        public void ReceiveHave(string peerName, int pieceId)
+        public void ReceiveHave(string peerID, int pieceId)
         {
-
+            lock (bitFields)
+            {
+                bitFields[peerID][pieceId] = true;
+            }
         }
 
         /// <summary>
