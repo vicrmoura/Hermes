@@ -153,7 +153,7 @@ namespace Hermes
             {
                 client.cancel();
             }
-            fileInfo.downloader.cancel();
+            fileInfo.downloader.Cancel();
             return "Canceling download of " + fileInfo.file.ID;
         }
 

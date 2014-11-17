@@ -301,6 +301,7 @@ namespace Hermes
                     if (printTable)
                     {
                         Console.WriteLine("Page " + page + " of results for " + input[1] + ":");
+                        // TODO (croata): alinhar
                         Console.WriteLine("|- ID -|----- Name -----|----- Size -----|- Peers -|");
                         for (int i = 0; i < searchResults.Length; i++)
                         {
@@ -518,7 +519,6 @@ namespace Hermes
             }
         }
 
-        // TODO: ExecuteExecutewnload
         private static void ExecuteDownload(uint id)
         {
             string fileId = searchResults[id]["fileID"];
@@ -568,7 +568,6 @@ namespace Hermes
             }
         }
 
-        // TODO: ExecutePause
         private static void ExecutePause()
         {
             if (input.Length != 2)
@@ -579,10 +578,8 @@ namespace Hermes
 
             string message = downloadManager.pauseDownload(input[1]);
             Console.WriteLine(message);
-            
         }
 
-        // TODO: ExecuteContinue
         private static void ExecuteContinue()
         {
             if (input.Length != 2)
@@ -595,7 +592,6 @@ namespace Hermes
             Console.WriteLine(message);
         }
 
-        // TODO: ExecuteCancel
         private static void ExecuteCancel()
         {
             if (input.Length != 2)

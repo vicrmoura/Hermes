@@ -151,6 +151,8 @@ namespace Hermes
                     }
                     var orderedCounts = counts.OrderBy(c => c.Item2);
 
+                    // TODO (croata): fazer rand quando igual
+
                     Tuple<int, int> result = null;
                     foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
                     {
@@ -183,9 +185,9 @@ namespace Hermes
             
         }
 
-        public void cancel()
+        public void Cancel()
         {
-
+            // TODO (croata)
         }
 
         /// <summary>
