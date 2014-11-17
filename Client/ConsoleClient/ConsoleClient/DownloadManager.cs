@@ -16,6 +16,7 @@ namespace Hermes
 
     class DownloadManager
     {
+        public static readonly int MAX_DOWNLOADING_PEERS = 10;
         private Dictionary<string /*fileId*/, FileDownloadingInfo> filesInfo;
         private string myId;
         P2PServer server;
@@ -58,8 +59,32 @@ namespace Hermes
                         filesInfo.Remove(key);
                         Logger.log("DOWNLOADMANAGER","Completed downloading " + key);
                     }
+
+                    Logger.log("DownloadManager", "Procurando cancelados" );
+                    foreach (var fileInfo in filesInfo)
+                    {
+                        Logger.log("DownloadManager", "Para " + fileInfo.Key);
+                        var clients = fileInfo.Value.clients;
+                        List<P2PClient> clientsToBeRemoved = new List<P2PClient>();
+                        Logger.log("DownloadManager", "Tem " + clients.Count + "clientes");
+                        for (int i = 0; i < clients.Count; i++)
+                        {
+                            Logger.log("DownloadManager", "Cliente " + clients[i].IsFinished);
+                            if (clients[i].IsFinished)
+                            {
+                                clientsToBeRemoved.Add(clients[i]);
+                            }
+                        }
+                        foreach (var client in clientsToBeRemoved)
+                        {
+                            Logger.log("DownloadManager", "Deleting client:" + client.ServerId);
+                            clients.Remove(client);
+                        }
+                        
+                    }
+
                 }
-                System.Threading.Thread.Sleep(10000);
+                System.Threading.Thread.Sleep(5000);
             }
         }
 
@@ -89,6 +114,7 @@ namespace Hermes
         // should be called during heartbeat
         public void updatePeers(string fileId, List<Dictionary<string, dynamic>> peers)
         {
+            Logger.log("DownloadManager", "Updatando Peers");
             lock (filesInfo)
             {
                 if (!filesInfo.ContainsKey(fileId))
@@ -96,6 +122,27 @@ namespace Hermes
                     return;
                 }
                 filesInfo[fileId].peersInfo = peers;
+                lock(filesInfo[fileId].file)
+                {
+                    if (filesInfo[fileId].file.Status != StatusType.Downloading)
+                    {
+                        return;
+                    }
+                }
+
+                int at=0;
+                while (filesInfo[fileId].clients.Count < MAX_DOWNLOADING_PEERS && at < peers.Count)
+                {
+                    var peer = peers[at];
+
+                    if (filesInfo[fileId].clients.All((x)=> x.ServerId!=peer["peerID"]))
+                    {
+                        P2PClient client = new P2PClient(myId, peer["peerID"], filesInfo[fileId].downloader, peer["ip"], int.Parse(peer["port"]));
+                        filesInfo[fileId].clients.Add(client);
+                        Logger.log("DownloadManager", "Adicionando cliente " + client.ServerId);
+                    }
+                    at++;
+                }
             }
         }
 

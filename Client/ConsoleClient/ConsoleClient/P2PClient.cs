@@ -22,20 +22,26 @@ namespace Hermes
         private bool isDownloading;
         private string logLabel;
         private bool choked;
-        private string serverId;
+
+        public string ServerId {get; private set;}
+
+        
+
         private bool paused;
         private object unpauseCv;
 
+        public bool IsFinished { get; private set; }
 
         public P2PClient(string myId, string serverId, P2PDownloader downloader, string ip, int port)
         {
             Logger.log(CLIENT_LOG, "Initializing client " + myId);
             this.myId = myId;
-            this.serverId = serverId;
+            this.ServerId = serverId;
             this.downloader = downloader;
             this.isDownloading = false;
             this.choked = false;
             this.paused = false;
+            this.IsFinished = false;
             this.unpauseCv = new object();
             this.logLabel = myId + ":" + downloader.FileID;
             jsonSerializer = new JavaScriptSerializer();
@@ -81,7 +87,7 @@ namespace Hermes
                     Logger.log(logLabel, "Server didn't answer the handshake properly. Answer: " + handshake);
                 }
 
-                downloader.SetBitField(serverId, json["bitField"]);
+                downloader.SetBitField(ServerId, json["bitField"]);
 
                 Logger.log(logLabel, "Handshake complete");
 
@@ -116,7 +122,7 @@ namespace Hermes
                             }
                         }
                     }
-                    var tup = downloader.GetNextBlock(serverId);
+                    var tup = downloader.GetNextBlock(ServerId);
                     if (tup == null)
                     {
                         Logger.log(logLabel, "Finished downloading");
@@ -142,6 +148,8 @@ namespace Hermes
                 // Closing protocol
                 Logger.log(logLabel, "Closing connection");
                 send(sw, closeMessage());
+
+                IsFinished = true;
 
                 t.Wait();
                 sw.Flush(); // send last messages
@@ -191,7 +199,7 @@ namespace Hermes
                             break;
                         case "have":
                             Logger.log(logLabel, "Received have for piece " + json["piece"]);
-                            downloader.ReceiveHave(serverId, json["piece"]);
+                            downloader.ReceiveHave(ServerId, json["piece"]);
                             break;
                         case "choke":
                             Logger.log(myId, "Being choked");
@@ -238,6 +246,7 @@ namespace Hermes
             {
                 Monitor.Pulse(requesterCv);
             }
+            IsFinished = true;
         }
 
         dynamic connectMessage(string fileId)
