@@ -14,16 +14,18 @@ namespace Hermes
         /* Constants */
 
         private const string DOWNLOADING = ".downloading";
+        private const int MAX_TIME = 10; // seconds
 
         /* Fields */
 
         public readonly string FileID;
-
         private readonly HFile hfile;
         private readonly string filePath;
         private readonly P2PServer server;
         private readonly Dictionary<string/*peerId*/, BitArray> bitFields;
         private readonly HashSet<Tuple<int, int>> requestedBlocks;
+        private readonly Dictionary<Tuple<int, int>, int> blockTimes;
+        private bool finished = false;
 
         /* Constructor */
 
@@ -35,6 +37,7 @@ namespace Hermes
             this.filePath = Path.Combine(Program.BaseFolder, hfile.Name + DOWNLOADING);
             this.bitFields = new Dictionary<string, BitArray>();
             this.requestedBlocks = new HashSet<Tuple<int, int>>();
+            this.blockTimes = new Dictionary<Tuple<int, int>, int>();
 
             lock (hfile)
             {
@@ -46,6 +49,34 @@ namespace Hermes
                     }
                 }
             }
+
+            Task.Run(() =>
+            {
+                var toDelete = new List<Tuple<int, int>>();
+                while (!finished)
+                {
+                    toDelete.Clear();
+
+                    lock (requestedBlocks)
+                    {
+                        foreach (var block in blockTimes.Keys)
+                        {
+                            blockTimes[block]--;
+                            if (blockTimes[block] == 0)
+                            {
+                                toDelete.Add(block);
+                            }
+                        }
+                        foreach (var block in toDelete)
+                        {
+                            blockTimes.Remove(block);
+                            requestedBlocks.Remove(block);
+                        }
+                    }
+
+                    System.Threading.Thread.Sleep(1000);
+                }
+            });
         }
 
         /* Methods */
@@ -116,26 +147,20 @@ namespace Hermes
                         {
                             if (piece.BitField[idxBlock] == '0')
                             {
-                                bool contains;
                                 lock (requestedBlocks)
                                 {
-                                    contains = requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock));
-                                }
-                                if (!contains)
-                                {
-                                    result = Tuple.Create(idxPiece, idxBlock);
-                                    lock (requestedBlocks)
+                                    if (!requestedBlocks.Contains(Tuple.Create(idxPiece, idxBlock)))
                                     {
+                                        result = Tuple.Create(idxPiece, idxBlock);
                                         requestedBlocks.Add(result);
+                                        blockTimes[result] = MAX_TIME;
+                                        goto end;
                                     }
-                                    goto end;
                                 }
                             }
                         }
                     }
-                end:
-                    //Logger.log("DOWNLOADER", "Mandando bloco (" + result.Item1 + ", " + result.Item2 + ")");
-                    return result;
+                    end: return result;
                 }
             }
             catch (Exception e)
@@ -214,6 +239,7 @@ namespace Hermes
                 // Remove .downloading
                 if (completed)
                 {
+                    finished = true;
                     lock (hfile)
                     {
                         hfile.Status = StatusType.Completed;
