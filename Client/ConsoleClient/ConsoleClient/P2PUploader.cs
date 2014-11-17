@@ -62,13 +62,17 @@ namespace Hermes
             long offset = piece * (long)hfile.PieceSize + block * (long)hfile.BlockSize;
             int size = Math.Min(hfile.BlockSize, hfile.Pieces[piece].Size - block * hfile.BlockSize);
             byte[] byteData = new byte[size];
-            using (FileStream stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            lock (hfile.Name)
             {
-                stream.Seek(offset, SeekOrigin.Begin);
-                int bytesRead = stream.Read(byteData, 0, size);
-                if (bytesRead != size)
+                string path = File.Exists(filePath) ? filePath : filePath + P2PDownloader.DOWNLOADING;
+                using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
-                    throw new Exception("bytesRead != size");
+                    stream.Seek(offset, SeekOrigin.Begin);
+                    int bytesRead = stream.Read(byteData, 0, size);
+                    if (bytesRead != size)
+                    {
+                        throw new Exception("bytesRead != size");
+                    }
                 }
             }
 

@@ -13,7 +13,7 @@ namespace Hermes
     {
         /* Constants */
 
-        private const string DOWNLOADING = ".downloading";
+        public const string DOWNLOADING = ".downloading";
         private const int MAX_TIME = 5; // seconds
 
         /* Fields */
@@ -250,7 +250,10 @@ namespace Hermes
                     {
                         hfile.Status = StatusType.Completed;
                         hfile.Percentage = 1.0;
-                        File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length));
+                        lock (hfile.Name)
+                        {
+                            File.Move(filePath, filePath.Substring(0, filePath.Length - DOWNLOADING.Length)); 
+                        }
                     }
                 }
 
