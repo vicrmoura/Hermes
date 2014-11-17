@@ -300,19 +300,19 @@ namespace Hermes
                 {
                     if (printTable)
                     {
-                        Console.WriteLine("Page " + page + " of results for " + input[1] + ":");
+                        Console.WriteLine("Page " + page + " of results for " + input[1] + ":\n");
                         // TODO (croata): alinhar
-                        Console.WriteLine("|- ID -|----- Name -----|----- Size -----|- Peers -|");
+                        Console.WriteLine("|- ID -|--------------------- Name ---------------------|-- Size --|- Peers -|");
                         for (int i = 0; i < searchResults.Length; i++)
                         {
                             Console.WriteLine(String.Format(
-                                "|{0, 6}|{1, 16}|{2, 16}|{3,9}|",
+                                "| {0,4} | {1,-46} | {2,8} | {3,7} |",
                                 i + 1,
-                                searchResults[i]["name"],
-                                searchResults[i]["size"],
+                                searchResults[i]["name"].Substring(0, Math.Min(46, searchResults[i]["name"].Length)),
+                                SizeToString(searchResults[i]["size"]),
                                 searchResults[i]["numOfPeers"]));
                         }
-                        Console.WriteLine("n: next page, p: previous page, <id>: download file <id>, q: quit");
+                        Console.WriteLine("\nn: next page, p: previous page, <id>: download file <id>, q: quit");
                     }
                     Console.Write("S> ");
                     command = Console.ReadLine();
@@ -431,7 +431,7 @@ namespace Hermes
 
         private static void ExecuteList()
         {
-            Console.WriteLine("|------------------ Name ------------------|-- size --|-- % --|--- Status ---|");
+            Console.WriteLine("|------------------ Name ------------------|-- Size --|-- % --|--- Status ---|");
             foreach (var hfile in files.Values)
             {
                 Console.Write(string.Format("| {0,-40} ", hfile.Name.Substring(0, Math.Min(40, hfile.Name.Length))));
