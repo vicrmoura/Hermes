@@ -14,7 +14,7 @@ namespace Hermes
         /* Constants */
 
         private const string DOWNLOADING = ".downloading";
-        private const int MAX_TIME = 10; // seconds
+        private const int MAX_TIME = 5; // seconds
 
         /* Fields */
 
@@ -80,7 +80,7 @@ namespace Hermes
                         }
                     }
 
-                    System.Threading.Thread.Sleep(1000);
+                    System.Threading.Thread.Sleep(500);
                 }
             });
         }
