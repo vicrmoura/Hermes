@@ -53,24 +53,30 @@ namespace Hermes
             Task.Run(() =>
             {
                 var toDelete = new List<Tuple<int, int>>();
+                var blockTimesCopy = new Dictionary<Tuple<int, int>, int>();
                 while (!finished)
                 {
-                    toDelete.Clear();
-
                     lock (requestedBlocks)
                     {
+                        toDelete.Clear();
+                        blockTimesCopy.Clear();
                         foreach (var block in blockTimes.Keys)
                         {
-                            blockTimes[block]--;
-                            if (blockTimes[block] == 0)
+                            blockTimesCopy[block] = blockTimes[block] - 1;
+                            if (blockTimesCopy[block] == 0)
                             {
                                 toDelete.Add(block);
                             }
                         }
                         foreach (var block in toDelete)
                         {
-                            blockTimes.Remove(block);
+                            blockTimesCopy.Remove(block);
                             requestedBlocks.Remove(block);
+                        }
+                        blockTimes.Clear();
+                        foreach (var block in blockTimesCopy.Keys)
+                        {
+                            blockTimes[block] = blockTimesCopy[block];
                         }
                     }
 
@@ -252,6 +258,7 @@ namespace Hermes
                 lock (requestedBlocks)
                 {
                     requestedBlocks.Remove(Tuple.Create(piece, block));
+                    blockTimes.Remove(Tuple.Create(piece, block));
                 }
             }
         }
