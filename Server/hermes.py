@@ -172,6 +172,7 @@ def process_search_query(search_text, limit, offset):
         match_ids = list(set.intersection(*matches))[offset:min(MAX_SEARCH_LIMIT, limit)]
         for i in match_ids:
             with file_info_locks[i]:
+                check_heartbeat(i)
                 results.append( {
                         "name": file_info[i]["name"],
                         "size": file_info[i]["size"],
