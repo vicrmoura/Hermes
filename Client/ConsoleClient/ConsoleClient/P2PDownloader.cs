@@ -224,7 +224,8 @@ namespace Hermes
                     char[] bits = hfile.Pieces[piece].BitField.ToCharArray();
                     if (bits[block] != '0')
                     {
-                        throw new InvalidOperationException("Already possessed (piece, block) = (" + piece + ", " + block + ")");
+                        Logger.log("Downloader", "[WARNING] Already possessed (piece, block) = (" + piece + ", " + block + ")");
+                        return;
                     }
                     bits[block] = '1';
                     hfile.Pieces[piece].BitField = new string(bits);
