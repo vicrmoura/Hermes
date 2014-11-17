@@ -195,7 +195,17 @@ namespace Hermes
 
         public void Cancel()
         {
-            // TODO (croata): Implement Cancel
+            lock (hfile)
+            {
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+                else if (File.Exists(filePath + DOWNLOADING))
+                {
+                    File.Delete(filePath + DOWNLOADING);
+                }
+            }
         }
 
         /// <summary>
