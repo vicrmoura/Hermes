@@ -236,6 +236,7 @@ namespace Hermes
                 }
                 else
                 {
+                    file.Pieces[i].Size = file.PieceSize;
                     file.Pieces[i].BitField = new string('0', ratio);
                 }
             }

@@ -194,7 +194,8 @@ namespace Hermes
                             foreach (var have in aux)
                             {
                                 send(sw, haveMessage(have));
-                                haveList[peerId].Take(have);
+                                int x;                               
+                                haveList[peerId].TryTake(out x);
                             }
                         }
 

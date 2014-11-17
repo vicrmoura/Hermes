@@ -43,39 +43,48 @@ namespace Hermes
         /// <returns>Block data in base64</returns>
         public string getBlock(int piece, int block)
         {
-            lock (hfile)
+            byte[] byteData = new byte[1];
+            try
             {
-                if (hfile.BitField[piece] == '0')
+                lock (hfile)
                 {
-                    throw new ArgumentException("HFile doesn't posses that piece", "piece");
-                }
-            }
-
-            lock (hfile.Pieces[piece])
-            {
-                if (hfile.Pieces[piece].BitField[block] == '0')
-                {
-                    throw new ArgumentException("HFile doesn't posses that (piece, block)", "block");
-                }
-            }
-
-            long offset = piece * (long)hfile.PieceSize + block * (long)hfile.BlockSize;
-            int size = Math.Min(hfile.BlockSize, hfile.Pieces[piece].Size - block * hfile.BlockSize);
-            byte[] byteData = new byte[size];
-            lock (hfile.Name)
-            {
-                string path = File.Exists(filePath) ? filePath : filePath + P2PDownloader.DOWNLOADING;
-                using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    stream.Seek(offset, SeekOrigin.Begin);
-                    int bytesRead = stream.Read(byteData, 0, size);
-                    if (bytesRead != size)
+                    if (hfile.BitField[piece] == '0')
                     {
-                        throw new Exception("bytesRead != size");
+                        throw new ArgumentException("HFile doesn't posses that piece", "piece");
                     }
                 }
-            }
 
+                lock (hfile.Pieces[piece])
+                {
+                    if (hfile.Pieces[piece].BitField[block] == '0')
+                    {
+                        throw new ArgumentException("HFile doesn't posses that (piece, block)", "block");
+                    }
+                }
+
+                long offset = piece * (long)hfile.PieceSize + block * (long)hfile.BlockSize;
+                int size = Math.Min(hfile.BlockSize, hfile.Pieces[piece].Size - block * hfile.BlockSize);
+                byteData = new byte[size];
+                lock (hfile.Name)
+                {
+                    string path = File.Exists(filePath) ? filePath : filePath + P2PDownloader.DOWNLOADING;
+                    using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        stream.Seek(offset, SeekOrigin.Begin);
+                        int bytesRead = stream.Read(byteData, 0, size);
+                        if (bytesRead != size)
+                        {
+                            throw new Exception("bytesRead != size");
+                        }
+                    }
+                }
+
+            }
+            catch (Exception e)
+            {
+                Logger.log("CROATA", e.ToString());
+                Logger.log("CROATA", "piece " + piece + " e bloco " + block);
+            }
             return Convert.ToBase64String(byteData);
         }
     }
