@@ -137,15 +137,15 @@ namespace Hermes
             }
             Console.WriteLine("[OK]");
 
+            // Initializing TrackerClient
+
+            trackerClient = new TrackerClient(TrackerIP, TrackerPort);
+
             // Start crawling BaseFolder
 
             Console.Write(string.Format(" * {0,-30}", "Start crawling BaseFolder"));
             StartCrawlingBaseFolder();
             Console.WriteLine("[OK]");
-
-            // Initializing TrackerClient
-
-            trackerClient = new TrackerClient(TrackerIP, TrackerPort);
 
             // Start p2p-server
 
@@ -466,12 +466,12 @@ namespace Hermes
             if (input.Length == 1)
             {
                 Console.WriteLine("Current IP:   " + LocalIP);
-                Console.WriteLine("Current port: 30403");
+                Console.WriteLine("Current port: " + LocalPort);
             }
             else
             {
                 Console.WriteLine("Old IP:   " + LocalIP);
-                Console.WriteLine("Old port: 30403");
+                Console.WriteLine("Old port: " + LocalPort);
 
                 if (TryParseIPPort(input[1], ref LocalIP, ref LocalPort))
                 {
