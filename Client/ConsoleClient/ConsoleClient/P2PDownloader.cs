@@ -100,6 +100,12 @@ namespace Hermes
             }
         }
 
+
+        public void ReceiveHave(string peerName, int pieceId)
+        {
+
+        }
+
         /// <summary>
         /// The next (piece, block) to download. Returns null if finished
         /// </summary>

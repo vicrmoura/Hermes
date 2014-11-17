@@ -167,6 +167,7 @@ namespace Hermes
             {
                 try
                 {
+                    
                     string data = sr.ReadLine();
                     if (data == null)  // disconnected
                     {
@@ -189,6 +190,8 @@ namespace Hermes
                             downloader.AddBlock(piece, block, content);
                             break;
                         case "have":
+                            Logger.log(logLabel, "Received have for piece " + json["piece"]);
+                            downloader.ReceiveHave(serverId, json["piece"]);
                             break;
                         case "choke":
                             Logger.log(myId, "Being choked");

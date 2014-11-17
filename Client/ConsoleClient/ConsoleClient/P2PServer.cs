@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ namespace Hermes
     {
         private Dictionary<string, int> qtd = new Dictionary<string,int>(); // for debuging purposes
 
+        Dictionary<string, BlockingCollection<int>> haveList;
 
         private static readonly string SERVER_LOG = "SERVER";
         private static readonly int MAX_UNCHOKED = 5;
@@ -38,6 +40,7 @@ namespace Hermes
             Logger.log(SERVER_LOG, "Initializing P2P server...");
             this.myId = myId;
             this.files = files;
+            this.haveList = new Dictionary<string,  BlockingCollection<int>>();
             this.tcpListener = new TcpListener(IPAddress.Any, port);
             this.chokedSet = new HashSet<string>();
             this.connectedPeers = new List<string>();
@@ -100,7 +103,7 @@ namespace Hermes
                                 case "connect":
                                     string fileId = json["fileId"];
                                     string id = json["peerId"];
-                                    peerId = id + "#" + fileId; // # is a forbidden character for fileId and peerId
+                                    peerId = fileId + "#" + id; // # is a forbidden character for fileId and peerId
                                     Logger.log(SERVER_LOG, string.Format("Peer \"{0}\" started handshake...", peerId));
                                     connected = true;
                                     lock (uploaders)
@@ -114,6 +117,7 @@ namespace Hermes
                                         {
                                             Logger.log(SERVER_LOG, "Connection with peer " + peerId + " accepted");
                                             uploaders[peerId] = new P2PUploader(fileId, files[fileId]);
+                                            haveList[peerId] = new BlockingCollection<int>();
                                         }
                                         if (!uploaders[peerId].fileExists())
                                         {
@@ -184,6 +188,15 @@ namespace Hermes
                         } 
 
                         // Send Have message
+                        if (haveList[peerId].Count > 0)
+                        {
+                            int[] aux = haveList[peerId].ToArray();
+                            foreach (var have in aux)
+                            {
+                                send(sw, haveMessage(have));
+                                haveList[peerId].Take(have);
+                            }
+                        }
 
                     }
                     catch (Exception e)
@@ -253,6 +266,14 @@ namespace Hermes
         {
             var dict = new Dictionary<string, dynamic>();
             dict["type"] = "unchoke";
+            return dict;
+        }
+
+        dynamic haveMessage(int piece)
+        {
+            var dict = new Dictionary<string, dynamic>();
+            dict["type"] = "have";
+            dict["piece"] = piece;
             return dict;
         }
 
@@ -326,8 +347,11 @@ namespace Hermes
 
         public void SendHave(HFile hfile, int piece)
         {
-            // TODO (harry): adicionar na fila concorrente
-           // throw new NotImplementedException();
+            var peers = haveList.Where((x) => x.Key.StartsWith(hfile.ID + "#"));
+            foreach (var peer in peers)
+            {
+                peer.Value.Add(piece);
+            }
         }
     }
 }
