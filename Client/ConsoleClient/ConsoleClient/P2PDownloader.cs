@@ -25,6 +25,7 @@ namespace Hermes
         private readonly Dictionary<string/*peerId*/, BitArray> bitFields;
         private readonly HashSet<Tuple<int, int>> requestedBlocks;
         private readonly Dictionary<Tuple<int, int>, int> blockTimes;
+        private readonly double[] numbers;
         private bool finished = false;
 
         /* Constructor */
@@ -38,6 +39,13 @@ namespace Hermes
             this.bitFields = new Dictionary<string, BitArray>();
             this.requestedBlocks = new HashSet<Tuple<int, int>>();
             this.blockTimes = new Dictionary<Tuple<int, int>, int>();
+            this.numbers = new double[hfile.Pieces.Length];
+
+            var rnd = new ThreadSafeRandom();
+            for (int i = 0; i < hfile.Pieces.Length; i++)
+            {
+                numbers[i] = rnd.NextDouble();
+            }
 
             lock (hfile)
             {
@@ -117,7 +125,7 @@ namespace Hermes
             Dictionary<string, BitArray> bitFieldsCopy;
             string myBitField;
             BitArray possible;
-            List<Tuple<int, int>> counts;
+            List<Tuple<int, double>> counts = new List<Tuple<int, double>>();
             try
             {
                 lock (this)
@@ -139,12 +147,12 @@ namespace Hermes
                     // possible = other & ~mine
                     possible = bitFieldsCopy[peerId].And(new BitArray(myBitField.Select(c => c == '0').ToArray()));
 
-                    counts = new List<Tuple<int, int>>();
+                    int counter = 0;
                     for (int i = 0; i < possible.Length; i++)
                     {
                         if (possible[i])
                         {
-                            counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b)));
+                            counts.Add(Tuple.Create(i, bitFieldsCopy.Values.Select(a => a[i]).Count(b => b) + numbers[counter++]));
                         }
                     }
                     if (counts.Count == 0)
@@ -152,8 +160,6 @@ namespace Hermes
                         return null;
                     }
                     var orderedCounts = counts.OrderBy(c => c.Item2);
-
-                    // TODO (croata): fazer rand quando igual
 
                     Tuple<int, int> result = null;
                     foreach (var idxPiece in orderedCounts.Select(t => t.Item1))
@@ -189,7 +195,7 @@ namespace Hermes
 
         public void Cancel()
         {
-            // TODO (croata)
+            // TODO (croata): Implement Cancel
         }
 
         /// <summary>
